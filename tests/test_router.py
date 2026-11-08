@@ -15,7 +15,7 @@ class Stub:
         self.judg = 0.05
         self.kind = "public_research"
 
-    def local(self, system, user, model=None, timeout=120):
+    def local(self, system, user, model=None, timeout=120, num_predict=None):
         self.prompts.append(("local", f"{system}\n{user}"))
         return self.answer, 5
 
