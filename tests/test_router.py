@@ -108,12 +108,13 @@ def test_picking_local_ticks_and_picking_claude_misses(stub):
     sent = research_pick(stub)
     local_letter = "a" if sent["options"]["a"] == "the box says 4 years" else "b"
     result = router.record_pick(person("maya"), sent["id"], local_letter)
-    assert result["label"].startswith(f"ON DEVICE · {llm.LOCAL_MODEL} · TESTING 1/3")
+    assert result["label"] == "TESTING 1/3"
     assert db.one("SELECT passed FROM evidence ORDER BY id DESC")["passed"] == 1
     sent = research_pick(stub)
     claude_letter = "b" if sent["options"]["a"] == "the box says 4 years" else "a"
     result = router.record_pick(person("maya"), sent["id"], claude_letter)
-    assert result["label"].startswith("CLOUD")
+    assert result["label"] == "TESTING 0/3"
+    assert result["reply"] != "the box says 4 years"
     assert db.one("SELECT passed FROM evidence ORDER BY id DESC")["passed"] == 0
 
 

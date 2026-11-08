@@ -345,12 +345,6 @@ def _offer_choice(rid, user_id, kind, box_result):
     _update(rid, status="choose", options=json.dumps({"a": a, "b": b, "a_is": a_is, "local": local, "cloud": cloud_text}), reply=None, shown=None, label="Which answer is better?")
 
 
-def _settled_label(side, row, progress):
-    if side == "local":
-        return f"ON DEVICE · {row['model']} · {progress} · {(row['box_ms'] or 0) / 1000:.1f}s"
-    return f"CLOUD · {progress} · {(row['cloud_ms'] or 0) / 1000:.1f}s"
-
-
 def _progress(user_id, kind):
     """TESTING 2/3 as of this answer, even when the row has just moved."""
     state = states.current(user_id, kind)
@@ -378,7 +372,7 @@ def record_pick(user_row, rid, choice):
     states.record_cloud(user_id, kind, choice == "both" or side == "cloud", rid)
     reply = options["local"] if side == "local" else options["cloud"]
     _update(rid, status="done", reply=reply, shown="reviewed", destination="box" if side == "local" else "claude", options=None,
-            label=_settled_label(side, row, _progress(user_id, kind)))
+            label=_progress(user_id, kind))
     audit.append(user_id, "pick", None, f"{user_row['name']} compared two answers and preferred {'the on-device answer' if side == 'local' else 'the cloud answer'}{' (both were good)' if choice == 'both' else ''}.")
     return view(rid)
 

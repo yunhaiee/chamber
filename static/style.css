@@ -17,6 +17,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .mono { font-family: ui-monospace, Menlo, monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
 .tag { color: var(--tag-ink); background: var(--tag-bg); border-radius: 3px; padding: 0 2px; font-weight: 600; }
 .dest { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.dest.testing { color: var(--ink); }
 .dest.box { color: var(--box); } .dest.claude { color: var(--cloud); } .dest.lawyer { color: var(--lawyer); } .dest.blocked { color: var(--fail); }
 .fail { color: var(--fail); }
 .signin { max-width: 320px; margin: 18vh auto 0; display: grid; gap: 12px; padding: 0 16px; }

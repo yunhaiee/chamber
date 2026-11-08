@@ -12,6 +12,7 @@ const state = { me: null, last: '', tryItems: [], docs: [], attached: [], tried:
 
 function destClass(label) {
   if (!label) return '';
+  if (label.startsWith('TESTING')) return 'testing';
   if (label.startsWith('CLOUD')) return 'claude';
   if (label.startsWith('HUMAN')) return 'lawyer';
   if (label.startsWith('ON DEVICE') || label.startsWith('KEPT')) return 'box';
