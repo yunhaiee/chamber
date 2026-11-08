@@ -39,6 +39,8 @@ def _ask_text(user_name, kind, title, text):
         "extract_beneficiaries": f"asked for the beneficiaries in{t}",
         "compute_distribution": f"asked for distribution math on{t}",
         "public_research": "asked a public research question",
+        "public_deadline": "asked about a public deadline",
+        "public_limit": "asked about a public fee or limit",
     }
     if kind == "advice":
         phrase = "asked whether to accept a settlement" if re.search(r"settle|offer|accept", text, re.I) else "asked for advice or a decision"
