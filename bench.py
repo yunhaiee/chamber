@@ -37,7 +37,7 @@ def run_one(req, group, kinds, cloud_too):
     ok, ms, reason, raw = None, None, "", ""
     if check:
         try:
-            raw, ms = llm.local_chat(system, user)
+            raw, ms = llm.local_chat(system, user, num_predict=prompts.max_tokens(req["kind"]))
             result = checks.run(check, llm.first_json(raw), req["doc_len"])
             ok, reason = result["ok"], result["reason"]
         except llm.LocalError as e:
@@ -49,7 +49,11 @@ def run_one(req, group, kinds, cloud_too):
         out = cloud.send(rid, req["user"], req["text"])
         cloud_ok = checks.run(check, {"answer": out["cloud_out"]})["ok"]
         cloud_ms = out["cloud_ms"]
-    privileged = int(prepared.PATH[req["kind"]][0] == "privileged" or bool(docs))
+        if not cloud_ok:
+            print("CLOUD FAILED", req["id"], out["cloud_out"][:400])
+    # A document whose answer key says Not Privileged is not privileged text, whatever row it sits on.
+    not_privileged = bool(check) and check.get("label") == "Not Privileged"
+    privileged = int((prepared.PATH[req["kind"]][0] == "privileged" or bool(docs)) and not not_privileged)
     db.run(
         "INSERT INTO bench (run, group_name, user, kind, prepared_id, privileged_truth, box_ok, box_ms, reason, reply, d1_priv, d1_judg, d1_kind, d1_conf, d1_ms, cloud_ok, cloud_ms, ts) "
         "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -104,6 +108,10 @@ def report():
             )
     prepared_rows = [r for r in rows if r["group_name"] == "prepared" and r["d1_priv"] is not None]
     missed = [r for r in prepared_rows if r["privileged_truth"] and r["d1_priv"] < 0.30]
+    truly = sorted(r["d1_priv"] for r in prepared_rows if r["privileged_truth"])
+    advice = sorted(r["d1_judg"] for r in prepared_rows if r["kind"] == "advice")
+    other = sorted(r["d1_judg"] for r in prepared_rows if r["kind"] != "advice")
+    kind_right = sum(1 for r in prepared_rows if r["d1_kind"] == r["kind"])
     false_alarms = [r for r in prepared_rows if not r["privileged_truth"] and r["d1_priv"] >= 0.30 and r["kind"] == "public_research"]
     twist = [r for r in rows if r["group_name"] == "twist"]
     depos = {}
@@ -115,6 +123,8 @@ def report():
     lines += [
         "",
         f"Privileged scored public by d1 alone at 0.30: {len(missed)} of {sum(1 for r in prepared_rows if r['privileged_truth'])}",
+        f"Lowest privileged score: {truly[0]:.2f}. Advice judgment {advice[0]:.2f}-{advice[-1]:.2f}; everything else max {other[-1]:.2f}",
+        f"d1 chose the right kind: {kind_right} of {len(prepared_rows)}",
         f"Public research false alarms at 0.30: {len(false_alarms)} of {sum(1 for r in prepared_rows if r['kind'] == 'public_research')}",
         f"Depositions 1-7, runs passed: {[sum(v) for _, v in sorted(depos.items())]} of 3 each",
         f"Twist failed: {sum(1 for r in twist if not r['box_ok'])} of {len(twist)}",

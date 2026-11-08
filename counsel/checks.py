@@ -96,6 +96,21 @@ def has_section(text, section):
     return _section_pattern(section).search(compact) is not None
 
 
+def _minutes(hour, minute, meridiem):
+    hour = int(hour) % 12 + (12 if meridiem and meridiem[0].lower() == "p" else 0) if meridiem else int(hour)
+    return hour * 60 + int(minute)
+
+
+def has_time(text, value):
+    """06:30, 6:30 and 6:30 AM are the same time."""
+    hour, minute = str(value).split(":")
+    target = _minutes(hour, minute, None)
+    for m in re.finditer(r"(?<![\d:])(\d{1,2})[:.](\d{2})(?![\d:])\s*([ap]\.?m\b)?", text, re.I):
+        if _minutes(m.group(1), m.group(2), m.group(3)) == target:
+            return True
+    return False
+
+
 def has_fact(text, fact):
     """A required fact: number, date, time or name."""
     kind, value = fact["type"], fact["value"]
@@ -103,6 +118,8 @@ def has_fact(text, fact):
         return has_number(text, value)
     if kind == "date":
         return has_date(text, value)
+    if kind == "time":
+        return has_time(text, value)
     if kind == "text":
         return re.sub(r"\s+", " ", value).lower() in re.sub(r"\s+", " ", text).lower()
     raise ValueError(kind)

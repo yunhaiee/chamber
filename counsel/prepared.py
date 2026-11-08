@@ -162,7 +162,7 @@ def _deposition(rng, i):
         f"{last} estimated the load at {comma(cases)} cases of {rng.choice(GOODS)} for {shipper}, and said "
         f"Brightline's claims team valued the loss at {comma(theirs)}. Ours is {comma(ours)}. "
         f"Flag for the damages expert.\n\n"
-        f"On the email chain, {last} said a supervisor, {supervisor}, said \"don't write anything down about the alarm.\" "
+        f"On the email chain, {last} said the supervisor, {supervisor}, told the witness \"don't write anything down about the alarm.\" "
         f"Pierce instructed the witness not to answer follow-ups. We should move to compel.\n\n"
         f"{rng.choice(CHATTER)}\n\n"
         f"Follow-ups: send the errata reminder, ask Ruth whether to notice {supervisor}'s deposition, and get the "
@@ -172,7 +172,7 @@ def _deposition(rng, i):
     check = {
         "type": "facts", "max_ratio": 0.45,
         "facts": [
-            {"type": "date", "value": event_text}, {"type": "text", "value": t2},
+            {"type": "date", "value": event_text}, {"type": "time", "value": t2},
             {"type": "number", "value": str(theirs)}, {"type": "number", "value": str(ours)},
             {"type": "text", "value": supervisor},
         ],
@@ -441,21 +441,21 @@ def _client_letter(rng, i):
     return f"Preliminary distribution notes {i + 1}", body, request, check
 
 
+TWIST_DAYS = [
+    (90, "ninety"), (60, "sixty"), (45, "forty-five"), (30, "thirty"), (120, "one hundred twenty"),
+    (75, "seventy-five"), (105, "one hundred five"), (40, "forty"), (100, "one hundred"), (50, "fifty"),
+]
+
+
 def twist_case(i):
+    """A new client who describes dates instead of stating them."""
     signed = date(2026, 3, 3) + timedelta(days=9 * i)
     signed_text = f"{signed.day} {signed.strftime('%B')} {signed.year}"
-    if i % 2 == 0:
-        weeks = 2 + i // 2
-        word = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}[weeks]
-        due = signed + timedelta(weeks=weeks)
-        statement = f"We signed the lease on {signed_text}. The deposit is due {word} weeks after we signed the lease."
-    else:
-        closing = date(2026, 6, 12) + timedelta(days=7 * i)
-        days = {1: 90, 3: 60, 5: 45, 7: 30, 9: 120}[i]
-        word = {90: "ninety", 60: "sixty", 45: "forty-five", 30: "thirty", 120: "one hundred twenty"}[days]
-        closing_text = f"{closing.day} {closing.strftime('%B')} {closing.year}"
-        due = closing - timedelta(days=days)
-        statement = f"We signed the lease on {signed_text}. The deposit is due {word} days before the closing on {closing_text}."
+    closing = date(2026, 6, 12) + timedelta(days=7 * i)
+    days, word = TWIST_DAYS[i]
+    closing_text = f"{closing.day} {closing.strftime('%B')} {closing.year}"
+    due = closing - timedelta(days=days)
+    statement = f"We signed the lease on {signed_text}. The deposit is due {word} days before the closing on {closing_text}."
     body = (
         f"PRIVILEGED & CONFIDENTIAL · ATTORNEY-CLIENT COMMUNICATION\n"
         f"From: Rosa Imani, Corbel Robotics\nTo: Maya Chen\nSubject: dates for the file\n\n"
@@ -484,7 +484,7 @@ def build():
     add("maya", "summarize_deposition", DEPOSITION_REQUEST, "Reyes deposition, Day 2", DEPOSITION_1, {
         "type": "facts", "max_ratio": 0.45,
         "facts": [
-            {"type": "date", "value": "14 August"}, {"type": "text", "value": "06:30"},
+            {"type": "date", "value": "14 August"}, {"type": "time", "value": "06:30"},
             {"type": "number", "value": "61400"}, {"type": "number", "value": "74900"},
             {"type": "text", "value": "Karen Doyle"},
         ],

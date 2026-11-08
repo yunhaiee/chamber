@@ -46,7 +46,7 @@ def first_json(text):
     return None
 
 
-def local_chat(system, user, model=None, timeout=120):
+def local_chat(system, user, model=None, timeout=120, num_predict=None):
     """Call the local model. Returns (raw_text, ms). Raises LocalError on infra failure."""
     model = model or LOCAL_MODEL
     messages = ([{"role": "system", "content": system}] if system else []) + [
@@ -57,7 +57,7 @@ def local_chat(system, user, model=None, timeout=120):
         if LOCAL_API == "openai":
             r = httpx.post(
                 f"{LOCAL_BASE}/v1/chat/completions",
-                json={"model": model, "messages": messages, "temperature": 0, "seed": 7, "max_tokens": 900},
+                json={"model": model, "messages": messages, "temperature": 0, "seed": 7, "max_tokens": num_predict or 900},
                 timeout=timeout,
             )
             r.raise_for_status()
@@ -65,7 +65,7 @@ def local_chat(system, user, model=None, timeout=120):
         else:
             r = httpx.post(
                 f"{LOCAL_BASE}/api/chat",
-                json={"model": model, "messages": messages, "stream": False, "think": False, "options": OPTIONS},
+                json={"model": model, "messages": messages, "stream": False, "think": False, "options": {**OPTIONS, "num_predict": num_predict or OPTIONS["num_predict"]}},
                 timeout=timeout,
             )
             r.raise_for_status()

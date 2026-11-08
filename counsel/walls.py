@@ -44,7 +44,7 @@ def read(doc):
 def find_reference(user, text):
     """Decide whether typed text names a document.
 
-    Returns ("attach", doc), ("denied", doc), ("missing", name) or None.
+    Returns ("attach", doc, phrase), ("denied", doc, phrase), ("missing", None, phrase) or None.
     "denied" and "missing" produce the same reply to the person.
     """
     for match in re.finditer(rf"\b({_NOUNS})\b", text, re.I):
@@ -53,15 +53,16 @@ def find_reference(user, text):
         if not names:
             continue
         wanted = [n.lower() for n in names]
+        phrase = " ".join(names + [match.group(1)])
         mine, others = [], []
         for doc in db.all("SELECT d.*, m.name AS matter_name, m.parties FROM documents d JOIN matters m ON d.matter_id = m.id ORDER BY d.id"):
             hay = f"{doc['title']} {doc['matter_name']} {doc['parties']}".lower()
             if all(w in hay for w in wanted):
                 (mine if doc["matter_id"] in matters_of(user) else others).append(doc)
         if mine:
-            return ("attach", mine[0])
+            return ("attach", mine[0], phrase)
         if others:
-            return ("denied", others[0])
+            return ("denied", others[0], phrase)
         if _FETCH_VERB.search(text) and any(n[0].isupper() for n in names):
-            return ("missing", " ".join(names))
+            return ("missing", None, phrase)
     return None

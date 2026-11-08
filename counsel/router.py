@@ -6,7 +6,7 @@ import threading
 from . import audit, checks, cloud, db, decisions, leak, llm, localq, masking, net, prepared, prompts, states, walls
 
 PRIVILEGED_AT = 0.30
-JUDGMENT_AT = 0.50
+JUDGMENT_AT = 0.70  # calibrated on the prepared set: advice min 0.70, everything else max 0.67
 KIND_CONFIDENCE_AT = 0.50
 MARKER = re.compile(r"privileged|attorney[- ]client|work product|attorney notes", re.I)
 LAWYER_NAME = "Ruth Abernathy"
@@ -71,7 +71,7 @@ def _box(rid, user_id, kind, text, docs, prep, priority):
     """Run the box and grade it if this request has an answer key. Returns (parsed, ms, ok) or None on infra error."""
     system, user_text = prompts.build(kind, text, docs)
     try:
-        raw, ms = localq.run(lambda: llm.local_chat(system, user_text), priority)
+        raw, ms = localq.run(lambda: llm.local_chat(system, user_text, num_predict=prompts.max_tokens(kind)), priority)
     except llm.LocalError as e:
         _update(rid, status="error", notes=f"box: {e}")
         return None
@@ -218,15 +218,15 @@ def handle(user_row, text, doc_ids=(), source="chat"):
     if not prep and not docs:
         reference = walls.find_reference(user_id, text)
         if reference:
-            action, target = reference
+            action, target, phrase = reference
             if action == "attach":
                 docs = [target]
                 _update(rid, doc_ids=json.dumps([target["id"]]))
             elif action == "denied":
-                return refuse_as_missing(f"{text.split()[-2] if len(text.split()) > 1 else ''} {text.split()[-1]}".strip(" ."))
+                return refuse_as_missing(phrase)
             else:
                 _update(rid, kind="wall", destination="blocked", status="done", reply=walls.NOT_FOUND, label="")
-                audit.append(user_id, "wall.missing", "blocked", f'{user_row["name"]} asked for a document that does not exist. Nothing was shown.')
+                audit.append(user_id, "wall.missing", "blocked", f'{user_row["name"]} asked for "{phrase}". No such document exists. Nothing was shown.')
                 return view(rid)
 
     bodies = [(d["title"], walls.read(d)) for d in docs]
