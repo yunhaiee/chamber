@@ -1,0 +1,235 @@
+"""Masking for public text going to Claude. Privileged text is never masked and sent. It is not sent.
+
+The key (tag to value) stays on the box. Detection failure blocks the cloud call.
+"""
+import json
+import re
+
+from . import db, llm
+
+ALWAYS = [
+    ("api_key", "API keys"), ("token", "Access tokens"), ("password", "Passwords"),
+    ("gov_id", "Government IDs"), ("card", "Card numbers"), ("bank", "Bank account numbers"),
+]
+DEFAULTS = [("client", "Client and party names"), ("email", "Emails"), ("phone", "Phone numbers"), ("case", "Case numbers")]
+TAG_NAME = {
+    "client": "CLIENT", "email": "EMAIL", "phone": "PHONE", "case": "CASE", "api_key": "KEY", "token": "TOKEN",
+    "password": "PASSWORD", "gov_id": "ID", "card": "CARD", "bank": "ACCOUNT", "people_full": "PERSON",
+    "first_names": "PERSON", "last_names": "PERSON", "companies": "COMPANY", "addresses": "ADDRESS", "dates": "DATE",
+    "money": "AMOUNT", "term": "TERM",
+}
+NOTE = (
+    "Some values are replaced by placeholders like [CLIENT_1] or [PERSON_1]. Treat each one as the real value: "
+    "copy it exactly, brackets included, wherever that value belongs in your answer."
+)
+RULE_CHOICES = {
+    "people_full": "people's full names", "first_names": "first names", "last_names": "last names",
+    "companies": "companies", "addresses": "addresses", "dates": "dates", "money": "money amounts",
+    "other": "something else",
+}
+
+
+class MaskError(Exception):
+    pass
+
+
+def seed_defaults():
+    for key, label in ALWAYS:
+        db.run("INSERT INTO mask_items (grp, key, label, enabled, ts) VALUES ('always',?,?,1,?)", key, label, db.now())
+    for key, label in DEFAULTS:
+        db.run("INSERT INTO mask_items (grp, key, label, enabled, ts) VALUES ('default',?,?,1,?)", key, label, db.now())
+
+
+def party_names():
+    """Full party names and their distinctive first or last word, longest first."""
+    names = set()
+    for row in db.all("SELECT parties FROM matters"):
+        for party in json.loads(row["parties"]):
+            names.add(party)
+            words = party.split()
+            if len(words) >= 2:
+                short = words[-1] if party in ("Helen Rourke",) else words[0]
+                if len(short) >= 5:
+                    names.add(short)
+    return sorted(names, key=len, reverse=True)
+
+
+def luhn(digits):
+    total = 0
+    for i, ch in enumerate(reversed(digits)):
+        n = int(ch)
+        if i % 2:
+            n = n * 2 - 9 if n > 4 else n * 2
+        total += n
+    return total % 10 == 0
+
+
+PATTERNS = {
+    "api_key": re.compile(r"\b(?:sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,})"),
+    "gov_id": re.compile(r"(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)"),
+    "email": re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"),
+    "phone": re.compile(r"(?<![\d-])(?:\+?1[ .-]?)?\(?\d{3}\)?[ .-]\d{3}[ .-]\d{4}(?!\d)"),
+    "case": re.compile(r"\bCGC-\d{2}-\d{6}\b"),
+    "addresses": re.compile(r"\b\d{1,5}\s+(?:[A-Z][a-z]+\s+){1,3}(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Lane|Ln|Dr|Drive|Way)\b\.?"),
+    "dates": re.compile(
+        r"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)(?:\s+\d{4})?\b"
+        r"|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:,?\s+\d{4})?\b"
+    ),
+    "money": re.compile(r"\$\s?\d[\d,]*(?:\.\d+)?k?\b|\b\d[\d,]*(?:\.\d+)?\s?dollars\b", re.I),
+    "companies": re.compile(r"\b(?:[A-Z][a-z]+\s+){1,3}(?:Inc|LLC|Corp|Ltd|Co)\b\.?"),
+}
+GROUP_PATTERNS = {
+    "token": re.compile(r"\b(?:access[_ -]?token|auth[_ -]?token|bearer)\b\s*[:=]?\s*([A-Za-z0-9._-]{16,})", re.I),
+    "password": re.compile(r"\b(?:password|passcode|pwd)\b\s*(?:is|:|=)\s*(\S+)", re.I),
+    "bank": re.compile(r"\b(?:account|acct|iban|routing)\b[^\d\n]{0,15}(\d{6,17})\b", re.I),
+}
+CARD = re.compile(r"(?<![\d-])\d(?:[ -]?\d){12,18}(?!\d)")
+
+
+def _spans(text, items, find_people):
+    spans = []
+
+    def add(start, end, kind):
+        spans.append((start, end, kind))
+
+    for key in ("api_key", "gov_id"):
+        for m in PATTERNS[key].finditer(text):
+            add(m.start(), m.end(), key)
+    for key, pattern in GROUP_PATTERNS.items():
+        for m in pattern.finditer(text):
+            add(m.start(1), m.end(1), key)
+    for m in CARD.finditer(text):
+        digits = re.sub(r"\D", "", m.group())
+        if 13 <= len(digits) <= 19 and luhn(digits):
+            add(m.start(), m.end(), "card")
+
+    enabled = {i["key"] for i in items if i["enabled"]}
+    for key in ("email", "phone", "case"):
+        if key in enabled:
+            for m in PATTERNS[key].finditer(text):
+                add(m.start(), m.end(), key)
+    if "client" in enabled:
+        for name in party_names():
+            for m in re.finditer(rf"(?<![\w]){re.escape(name)}(?![\w])", text):
+                add(m.start(), m.end(), "client")
+
+    for item in items:
+        if item["grp"] != "added" or not item["enabled"]:
+            continue
+        key = item["key"]
+        if key in ("addresses", "dates", "money", "companies"):
+            for m in PATTERNS[key].finditer(text):
+                add(m.start(), m.end(), key)
+        elif key == "term":
+            for term in json.loads(item["terms"] or "[]"):
+                for m in re.finditer(rf"(?<!\w){re.escape(term)}(?!\w)", text, re.I):
+                    add(m.start(), m.end(), "term")
+        elif key in ("people_full", "first_names", "last_names"):
+            if find_people is None:
+                raise MaskError("name finder unavailable")
+            for full in find_people(text):
+                if not full or full not in text:
+                    continue
+                words = full.split()
+                targets = {"people_full": [full], "first_names": words[:1], "last_names": words[-1:]}[key]
+                for target in targets:
+                    for m in re.finditer(rf"(?<!\w){re.escape(target)}(?!\w)", text):
+                        add(m.start(), m.end(), key)
+    return spans
+
+
+def mask(text, find_people=None):
+    """Return (masked_text, keymap, tags). Raises MaskError so the caller can block the call."""
+    try:
+        items = db.all("SELECT * FROM mask_items")
+        spans = _spans(text, items, find_people)
+        spans.sort(key=lambda s: (s[0], -(s[1] - s[0])))
+        kept, last_end = [], 0
+        for start, end, kind in spans:
+            if start >= last_end:
+                kept.append((start, end, kind))
+                last_end = end
+        counters, by_value, out, cursor = {}, {}, [], 0
+        for start, end, kind in kept:
+            value = text[start:end]
+            if value not in by_value:
+                name = TAG_NAME[kind]
+                counters[name] = counters.get(name, 0) + 1
+                by_value[value] = f"[{name}_{counters[name]}]"
+            out.append(text[cursor:start])
+            out.append(by_value[value])
+            cursor = end
+        out.append(text[cursor:])
+        key = {tag: value for value, tag in by_value.items()}
+        return "".join(out), key, list(key)
+    except MaskError:
+        raise
+    except Exception as e:
+        raise MaskError(str(e)) from e
+
+
+TAG_RE = re.compile(r"\[[A-Z]+_\d+\]")
+
+
+def restore(text, keymap):
+    """Swap tags back. Returns (restored, notes) with a note for any changed or missing tag."""
+    notes = []
+    restored = text
+    for tag, value in keymap.items():
+        if tag not in text:
+            notes.append(f"{tag} missing from reply")
+        restored = restored.replace(tag, value)
+    for tag in set(TAG_RE.findall(text)):
+        if tag not in keymap:
+            notes.append(f"{tag} changed in reply")
+    return restored, notes
+
+
+RULE_START = re.compile(r"^\s*(?:please\s+)?(mask|hide|redact|anonymi[sz]e|stop masking|don'?t send|do not send|never send)\b", re.I)
+RULE_ANY = re.compile(r"\b(don'?t|do not|never)\b.{0,60}?\b(send|share)\b.{0,60}?\b(cloud|claude|outside)\b", re.I | re.S)
+OFF_WORDS = re.compile(r"\b(stop|unmask|turn off)\b", re.I)
+
+
+def is_privacy_rule(text):
+    return len(text) < 300 and bool(RULE_START.search(text) or RULE_ANY.search(text))
+
+
+DEFAULT_WORDS = {"client": r"client|part(?:y|ies)", "email": r"e-?mail", "phone": r"phone", "case": r"case number"}
+
+
+def apply_rule(user_id, text):
+    """Turn plain words into a masking list item. Returns the one-line reply."""
+    try:
+        answers, _ = llm.d1_decide(text, {
+            "item": {"type": "choice", "instructions": "What does this person want masked before text goes to the cloud?", "criteria": RULE_CHOICES},
+            "off": {"type": "noul", "instructions": "Does this message turn masking off for something, rather than adding masking?"},
+        })
+    except llm.LocalError:
+        return "Couldn't read that rule. Nothing changed."
+
+    choice, confidence = answers["item"]["choice"], answers["item"]["confidence"]
+    if OFF_WORDS.search(text) and answers["off"]["noul"] >= 0.5:
+        for key, words in DEFAULT_WORDS.items():
+            if re.search(words, text, re.I):
+                db.run("UPDATE mask_items SET enabled=0 WHERE grp='default' AND key=?", key)
+                label = next(l for k, l in DEFAULTS if k == key)
+                return f"Masking turned off: {label.lower()}."
+        return "Only default items can be turned off."
+
+    terms = re.findall(r"[\"“']([^\"”']{2,})[\"”']", text)
+    if not terms:
+        terms = [t for t in re.findall(r"(?<=[a-z,] )[A-Z][\w-]+(?: [A-Z][\w-]+)*", text)]
+    if terms and (choice == "other" or confidence < 0.5):
+        label = ", ".join(terms)
+        db.run("INSERT INTO mask_items (grp, key, label, enabled, added_by, words, terms, ts) VALUES ('added','term',?,1,?,?,?,?)",
+               label, user_id, text, json.dumps(terms), db.now())
+        return f"Added to masking: {label}."
+    if confidence < 0.5 or choice == "other":
+        return "Which should I mask: people's names, companies, addresses, dates or money amounts?"
+
+    label = RULE_CHOICES[choice]
+    existing = db.one("SELECT id FROM mask_items WHERE grp='added' AND key=?", choice)
+    if not existing:
+        db.run("INSERT INTO mask_items (grp, key, label, enabled, added_by, words, ts) VALUES ('added',?,?,1,?,?,?)",
+               choice, label, user_id, text, db.now())
+    return f"Added to masking: {label}."
