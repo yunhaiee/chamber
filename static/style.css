@@ -35,6 +35,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .line { margin-top: 4px; }
 .small { font-size: 12px; color: var(--muted); }
 .small button { text-decoration: underline; color: var(--muted); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 92%; }
+.pair .reply { max-width: none; }
+.choices { margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; }
 .rewrite { margin-top: 6px; padding: 8px; background: var(--bg-2); border-radius: 4px; }
 .tools { border-top: 1px solid var(--line); padding: 8px 16px 0; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; font-size: 13px; }
 .tools button.try { color: var(--ink); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }

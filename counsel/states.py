@@ -3,7 +3,8 @@ import threading
 
 from . import audit, db, llm, prepared
 
-REQUIRED = {"low": 5, "medium": 8}
+TRIALS = 3
+REQUIRED = {"low": TRIALS, "medium": TRIALS}
 _lock = threading.Lock()
 
 COLUMN = {"DRAFT": "box", "PROVEN": "box", "SHADOW": "claude", "CLAUDE": "claude", "LAWYER": "lawyer"}
@@ -61,6 +62,11 @@ def word(user, kind, state=None):
     return state
 
 
+def origin(user, kind):
+    row = db.one("SELECT to_state FROM row_events WHERE user=? AND kind=? AND model=? ORDER BY id LIMIT 1", user, kind, model())
+    return row["to_state"] if row else None
+
+
 def _matter_name(user):
     row = db.one("SELECT m.name FROM matters m JOIN memberships s ON s.matter = m.id WHERE s.user=? LIMIT 1", user)
     return row["name"] if row else ""
@@ -81,13 +87,13 @@ def record(user, kind, passed, request_id):
         live = _live(user, kind)
         label = prepared.label_for(user, kind)
         matter = _matter_name(user)
-        path = prepared.PATH.get(kind, ("privileged", ""))[0]
-        fallback = "SHADOW" if path == "public" else "DRAFT"
+        public = origin(user, kind) == "SHADOW"
+        fallback = "SHADOW" if public else "DRAFT"
 
         if state in ("DRAFT", "SHADOW", "CLAUDE"):
             need = required(kind)
             if len(live) >= need and all(r["passed"] for r in live[-need:]):
-                _move(user, kind, state, "PROVEN", "earned", f"{label} for {matter} is proven. The box passed {need} checks in a row.")
+                _move(user, kind, state, "PROVEN", "earned", f"{label} for {matter} is proven. The box passed {need} in a row.")
                 return
 
         if state == "PROVEN":
@@ -98,14 +104,13 @@ def record(user, kind, passed, request_id):
                 _move(user, kind, state, fallback, "lost", f"{label} for {matter} lost proven status. The box failed {fails} of its last {len(recent)} checks.")
             return
 
-        if state in ("DRAFT", "SHADOW") and len(live) >= 5:
+        if state in ("DRAFT", "SHADOW") and len(live) >= TRIALS:
             passes = sum(1 for r in live if r["passed"])
-            if passes * 2 < len(live):
-                fails = len(live) - passes
-                if path == "public":
-                    _move(user, kind, state, "CLAUDE", "failed out", f"{label} for {matter} stays with Claude. The box failed {fails} of {len(live)} checks.")
-                else:
-                    _move(user, kind, state, "LAWYER", "failed out", f"{label} for {matter} moved to a lawyer. The box failed {fails} of {len(live)} checks, and the cloud isn't allowed to see it.")
+            fails = len(live) - passes
+            if public:
+                _move(user, kind, state, "CLAUDE", "failed out", f"{label} for {matter} goes to Claude. The box passed {passes} of {len(live)} trials.")
+            elif passes * 2 < len(live):
+                _move(user, kind, state, "LAWYER", "failed out", f"{label} for {matter} moved to a lawyer. The box failed {fails} of {len(live)} checks, and the cloud isn't allowed to see it.")
 
 
 def rows_for(user):

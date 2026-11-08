@@ -11,9 +11,10 @@ PLAN = {
 }
 DAY_GAP = 1.5
 TWIST_GAP = 1.2
+TWIST_SENT = 5  # 2 misses lose proven, then 3 more fail out
 TOTAL_DAY = sum(n for plan in PLAN.values() for _, n in plan)
 
-_status = {"day": {"running": False, "done": 0, "total": TOTAL_DAY}, "twist": {"running": False, "done": 0, "total": 7}}
+_status = {"day": {"running": False, "done": 0, "total": TOTAL_DAY}, "twist": {"running": False, "done": 0, "total": TWIST_SENT}}
 _lock = threading.Lock()
 
 
@@ -99,7 +100,7 @@ def start_twist():
         db.run("INSERT INTO try_pointer (user, kind, idx) VALUES ('_system','twist',1)")
         _status["twist"].update(running=True, done=0)
     maya = db.one("SELECT * FROM users WHERE id='maya'")
-    jobs = [(maya, item) for item in prepared.twist_requests()]
+    jobs = [(maya, item) for item in prepared.twist_requests()[:TWIST_SENT]]
     threading.Thread(target=_run, args=("twist", jobs, TWIST_GAP, "twist"), daemon=True).start()
     return dict(_status["twist"])
 

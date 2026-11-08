@@ -159,6 +159,22 @@ def fix(body: dict, user=Depends(associate)):
     return {"ok": True}
 
 
+@app.post("/api/pick")
+def pick(body: dict, user=Depends(associate)):
+    result = router.record_pick(user, int(body.get("request_id", 0)), str(body.get("choice")))
+    if result is None:
+        raise HTTPException(404, "Not found")
+    return result
+
+
+@app.post("/api/review")
+def review(body: dict, user=Depends(associate)):
+    result = router.record_review(user, int(body.get("request_id", 0)), str(body.get("verdict")))
+    if result is None:
+        raise HTTPException(404, "Not found")
+    return result
+
+
 @app.post("/api/research-only")
 def research_only(body: dict, user=Depends(associate)):
     text = router.rewrite_question(user["id"], int(body.get("request_id", 0)))
@@ -185,6 +201,10 @@ def _short_result(row):
         return "queued"
     if row["status"] == "waiting":
         return "waiting"
+    if row["status"] == "choose":
+        return "waiting on a pick"
+    if row["status"] == "confirm":
+        return "waiting on review"
     if row["destination"] == "blocked":
         return "blocked"
     if row["label"] and row["label"].startswith("KEPT ON THE BOX"):

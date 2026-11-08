@@ -83,6 +83,12 @@ function messageHtml(m) {
   if (m.can_fix) extra += `<button data-fix="${m.id}">I had to fix this</button>`;
   if (m.research_only) extra += ` &nbsp; <button data-rewrite="${m.id}">Send only the question</button>`;
   const rewrite = state.rewrites[m.id];
+  if (m.ask === 'choose') {
+    return `<div class="ask"><div class="body ${long && !open ? 'short' : ''}" data-open="${m.id}">${esc(m.text)}</div></div>
+      <div><div class="pair"><div><div class="eyebrow">A</div><div class="reply">${esc(m.options.a)}</div></div><div><div class="eyebrow">B</div><div class="reply">${esc(m.options.b)}</div></div></div>
+      <div class="small choices"><button data-pick="a" data-id="${m.id}">A is better</button><button data-pick="b" data-id="${m.id}">B is better</button><button data-pick="both" data-id="${m.id}">Both good</button><button data-pick="neither" data-id="${m.id}">Neither</button></div></div>`;
+  }
+  if (m.ask === 'confirm') extra = `<button data-review="good" data-id="${m.id}">Good</button> &nbsp; <button data-review="fixed" data-id="${m.id}">Had to fix</button> &nbsp; <button data-review="lawyer" data-id="${m.id}">Needs a lawyer</button>`;
   return `<div class="ask"><div class="body ${long && !open ? 'short' : ''}" data-open="${m.id}">${esc(m.text)}</div>
       ${m.docs.map(d => `<div class="doc">${esc(d)}</div>`).join('')}</div>
     <div>${m.reply && !(m.label || '').startsWith('A LAWYER') ? `<div class="reply">${esc(m.reply)}</div>` : ''}
@@ -101,6 +107,8 @@ function render() {
   log.innerHTML = messages.map(messageHtml).join('') + (state.sending ? `<div class="ask"><div class="body short">${esc(state.sending.text)}</div></div><div class="small">…</div>` : '');
   if (nearBottom || state.sending) log.scrollTop = log.scrollHeight;
   log.querySelectorAll('[data-open]').forEach(el => el.onclick = () => { const id = Number(el.dataset.open); state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id); render(); });
+  log.querySelectorAll('[data-pick]').forEach(b => b.onclick = async () => { await post('/api/pick', { request_id: Number(b.dataset.id), choice: b.dataset.pick }); state.last = ''; poll(); });
+  log.querySelectorAll('[data-review]').forEach(b => b.onclick = async () => { await post('/api/review', { request_id: Number(b.dataset.id), verdict: b.dataset.review }); state.last = ''; poll(); });
   log.querySelectorAll('[data-fix]').forEach(b => b.onclick = async () => { await post('/api/fix', { request_id: Number(b.dataset.fix) }); b.textContent = 'Recorded'; });
   log.querySelectorAll('[data-rewrite]').forEach(b => b.onclick = async () => { b.textContent = '…'; const r = await post('/api/research-only', { request_id: Number(b.dataset.rewrite) }); state.rewrites[b.dataset.rewrite] = r.text; render(); });
   log.querySelectorAll('[data-send-rewrite]').forEach(b => b.onclick = () => { const id = b.dataset.sendRewrite; const t = state.rewrites[id]; delete state.rewrites[id]; send(t); });
