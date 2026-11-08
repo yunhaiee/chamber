@@ -103,10 +103,10 @@ def _spot_due(user_id, kind):
     return n % 10 == 0
 
 
-def find_people(text):
+def find_people(text, priority=localq.CHAT):
     """Names are found by LFM3 on the box; only values that really appear are accepted."""
     system = 'List the full names of real people in the text. Reply with one JSON object and nothing else: {"answer": ["name"], "actions": []}.'
-    raw, _ = localq.run(lambda: llm.local_chat(system, text))
+    raw, _ = localq.run(lambda: llm.local_chat(system, text, num_predict=80), priority)
     parsed = llm.first_json(raw) or {}
     names = parsed.get("answer") or []
     return [n for n in names if isinstance(n, str) and n in text]
@@ -115,7 +115,8 @@ def find_people(text):
 def _send_cloud(rid, user_row, kind, text, state_word, source):
     """Run the cloud half of a request. Returns the reply fields."""
     try:
-        result = cloud.send(rid, user_row["id"], text, find_people=find_people)
+        priority = localq.DAY if source == "day" else localq.CHAT
+        result = cloud.send(rid, user_row["id"], text, find_people=lambda t: find_people(t, priority))
     except cloud.Blocked as e:
         _update(rid, status="blocked", destination="blocked", notes=f"masking failed: {e}", reply="Cloud blocked: masking failed.", label="BLOCKED")
         audit.append(user_row["id"], "cloud.blocked", "blocked", f"{user_row['name']}'s request was blocked because masking failed. Nothing was sent.")
