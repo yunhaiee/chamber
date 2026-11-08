@@ -51,7 +51,8 @@ def _schedule():
         for user in lanes:
             if lanes[user]:
                 order.append((user, lanes[user].pop(0)))
-    return order
+    # Tasks both people share go first, so the split between them shows within seconds.
+    return sorted(order, key=lambda job: job[1] not in ("public_deadline", "public_limit"))
 
 
 def _send(name, user_row, item, source):

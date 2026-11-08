@@ -1,6 +1,6 @@
 # Counsel Box: 3-minute demo
 
-**The one line:** Don't decide what runs locally. Let the local model prove it. And let the box refuse what must never leave.
+**The one line:** Don't decide what runs locally. Let the local model prove it. And let the device refuse what must never leave.
 
 ---
 
@@ -52,39 +52,45 @@ curl -s localhost:11434/api/chat -d '{"model":"lfm3:1.7b","stream":false,"messag
 
 ## The script
 
-### 0:00 Maya earns it (30s)
-**Say:** "One device, several lawyers, one assistant. Nothing is decided in advance."
+### 0:00 The problem (35s)
+Nothing to click. Boards are empty.
+
+**Say:** "Firms want to move to on-device AI, because client files can't go to the cloud. But what happens when the work stops getting done after the switch? That's why you need a hybrid: some work local, some in the cloud.
+
+So where's the line? You could draw a fixed one. But nobody knows what a small model can really do with a lawyer's work. It differs between firms, between roles, even between two people doing the same task in different practices.
+
+So we don't draw the line. Each model has to earn it."
+
+### 0:35 Maya earns it (20s)
 
 | Pane | Do |
 |---|---|
-| Maya | Click **Public deadline**, Enter. Two unlabeled answers appear. Press the button below. Repeat 3 times. |
+| Maya | Click **Public deadline**, Enter. Two unlabeled answers appear. Press **Both good**. Repeat 3 times. |
 
-| Try | Correct answer | Press |
-|---|---|---|
-| 1 | December 12, 2026, Dept 330 | **Both good** |
-| 2 | November 22, 2026, Dept 389 | **Both good** |
-| 3 | November 19, 2026, Dept 489 | **Both good** |
+| Try | Correct answer |
+|---|---|
+| 1 | December 12, 2026, Dept 330 |
+| 2 | November 22, 2026, Dept 389 |
+| 3 | November 19, 2026, Dept 489 |
 
 **You should see:** on the Board, Maya's **Public deadline** goes from Testing to **On device**.
 
-**Say:** "New work runs on both models, and the person picks without knowing which is which. Three right, and the cloud stops being called."
+**Say:** "Liquid's d1 model reads every request on this device and decides where it can go. This one's public, so new work runs on both models, and the lawyer picks without knowing which is which. Three right, and the cloud stops being called."
 
-### 0:30 Masking (15s)
+### 0:55 Masking (15s)
 
 | Pane | Do |
 |---|---|
 | Maya | Click **Research**, Enter. Pick the answer that says **4 years, § 337**. |
 | Dashboard | Press `2`, and point at `[CLIENT_1]` and the Key. Press `1` to go back. |
 
-**Say:** "The client name never left. The key stays here, and we swap it back on device."
+**Say:** "When work does go to the cloud, the client's name doesn't. The key stays on this device, and we swap the name back here."
 
-### 0:45 Privileged work (25s)
+### 1:10 Privileged work (20s)
 
 | Pane | Do | You should see |
 |---|---|---|
 | Maya | Click **Summarize deposition**, Enter | `ON DEVICE · lfm3:1.7b` |
-
-**Say:** "Privileged, so it never leaves the device."
 
 Point at the label. Don't read the bullets aloud, because the summary runs long.
 
@@ -96,64 +102,49 @@ What is the deadline to remove a case to federal court? Here is the email from o
 
 **You should see:** `KEPT ON DEVICE · privileged 0.90`
 
-**Say:** "A research question with a privileged email pasted in. The router refuses to send it."
+**Say:** "d1 sees a public question with a privileged email pasted in, scores it 0.90, and the router refuses to send it. Privileged text only ever runs on device."
 
-### 1:10 History is per model (10s)
+### 1:30 History is per model (10s)
 
 | Pane | Do | You should see |
 |---|---|---|
 | Maya | Change the model at top right to **Liquid · lfm2.5:8b** | Maya's board empties |
 | Maya | Change it back to **Liquid · lfm3:1.7b** | Her rows return |
 
-**Say:** "Which model can do what really differs, so every model earns its own record."
+**Say:** "Which Liquid model can do what really differs, so every model earns its own record."
 
 **Change it back before going on.**
 
-### 1:20 Hitting the wall (15s)
+### 1:40 Hitting the wall (20s)
 
 | Pane | Do | You should see |
 |---|---|---|
 | Daniel | Type `Summarize the Harlow deposition.` | `No document called that in your matters.` |
 
-**Say:** "That's Maya's client. Daniel can't even learn the document exists."
+**Say:** "Maya and Daniel share the same on-device model on the same hardware, and Daniel still can't see her files. He can't even learn that document exists. Today this runs on my Mac. In a firm, it would run on a dedicated AI machine in the office."
 
-### 1:35 Same task, different home (35s)
+### 2:00 The firm's day, then same task, different home (25s)
+Press `f` on the dashboard. Press `1` if you aren't on the Board. Give it about 20 seconds.
 
-| Pane | Do |
-|---|---|
-| Daniel | Click **Public deadline**, Enter. Three times. |
+**You should see:** Daniel's **Public deadline** and **Public fee or limit** land in **Cloud**. Maya's are **On device**.
 
-The letters are shuffled, so read the dates.
+**Say:** "That's the rest of the firm's day. Same task names, different homes. Maya reads a date printed on a docket. Daniel has to count four months from letters, and this small model can't do that reliably. Nobody wrote that rule. The evidence did."
 
-| Try | Correct answer | Press |
-|---|---|---|
-| 1 | 2027-01-19 | The correct one, or **Both good** if both match |
-| 2 | 2027-02-24 | **The correct one.** The on-device answer is usually wrong here. |
-| 3 | 2027-03-22 | The correct one, or **Both good** if both match |
-
-**You should see:** Daniel's **Public deadline** lands in **Cloud**. Maya's stays **On device**.
-
-**Say:** "Same task name. Maya reads a date printed on a docket. Daniel has to count four months from letters, and the small model can't do that reliably. Nobody wrote that rule. The evidence did."
-
-### 2:10 Human in the loop (15s)
-Press `f` on the dashboard. The boards fill for about 60 seconds while you keep going.
-
+### 2:25 Human in the loop (10s)
 Type this in Maya's box: `Should we accept Brightline's offer?`
 
 **You should see:** `HUMAN · Added to Ruth Abernathy's queue.`
 
-**Say:** "A legal decision. No AI answers it. It goes to a person."
+**Say:** "d1 recognizes a legal decision. No AI answers it. It goes to a person."
 
-### 2:25 Close (35s)
-Press `3` for the audit log. Point at `Privileged text sent to cloud 0`, `Log intact`, and Daniel's blocked attempt.
+### 2:35 Close (25s)
+Press `3` for the audit log. Point at `Privileged text sent to cloud 0` and `Log intact`. Bring Terminal 3 forward for a moment. Press `1` for the Board.
 
-Bring Terminal 3 forward.
+**Say:** "Nothing privileged left the building, and the managing partner can read exactly what did.
 
-**Say:** "This is every word that left the building. Client names are tags."
+Firms don't have to guess what can run locally. Every person, task and model builds its own record. And it isn't only law: clinics, accountants and HR all face the same question, and the answer is different for each of them.
 
-Press `1` for the Board, still filling in.
-
-**Say:** "Liquid's d1 decides, LFM3 does the work, and privileged text never leaves. The same device fits a clinic, an accounting firm or HR. Don't decide what runs locally. Let the local model prove it."
+Don't decide what runs locally. Let the local model prove it."
 
 ---
 
@@ -166,6 +157,7 @@ Press `1` for the Board, still filling in.
 | Wi-Fi drops | Say so. On-device work continues, and cloud work shows `Waiting for connection` and runs on reconnect. |
 | Chat shows an error | `curl localhost:9931/health`, then rerun clean start and refresh. |
 | Wrong model is selected | Switch back to `lfm3:1.7b` before pressing `f`. |
+| Daniel's rows still say Testing | Wait a few more seconds. His last trials are still finishing. |
 | Maya's row didn't reach On device | One pick went to the cloud. Say the evidence decided, and move on. |
 
 ---
@@ -173,7 +165,7 @@ Press `1` for the Board, still filling in.
 ## Say this honestly
 
 - The firm, its matters and documents are synthetic. Every route, check and log entry on screen is real and live.
-- If it's on the laptop, say so. The header shows the real machine name.
+- This runs on a Mac laptop, and the header shows the real machine name. It hasn't been run on dedicated AI hardware yet.
 - 3 trials is a demo bar. A real firm would need far more.
 - "Privileged text sent 0" means our leak test found none. d1 can misjudge, which is why thresholds lean toward privileged and hard rules back it up. This reduces risk. It doesn't replace a firm's ethics obligations.
 - Research answers come from the cloud and still need checking against the source. This isn't legal advice.

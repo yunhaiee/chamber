@@ -144,6 +144,13 @@ def test_each_model_keeps_its_own_record(stub):
     assert states.current("maya", "public_research") == "PROVEN"
 
 
+def test_automatic_day_sends_shared_tasks_first():
+    from counsel import day
+    order = day._schedule()
+    assert len(order) == day.TOTAL_DAY
+    assert {kind for _, kind in order[:12]} == {"public_deadline", "public_limit"}
+
+
 def test_one_person_cannot_answer_anothers_pick(stub):
     sent = research_pick(stub)
     assert router.record_pick(person("daniel"), sent["id"], "a") is None
