@@ -167,14 +167,6 @@ def pick(body: dict, user=Depends(associate)):
     return result
 
 
-@app.post("/api/review")
-def review(body: dict, user=Depends(associate)):
-    result = router.record_review(user, int(body.get("request_id", 0)), str(body.get("verdict")))
-    if result is None:
-        raise HTTPException(404, "Not found")
-    return result
-
-
 @app.post("/api/research-only")
 def research_only(body: dict, user=Depends(associate)):
     text = router.rewrite_question(user["id"], int(body.get("request_id", 0)))
@@ -203,11 +195,9 @@ def _short_result(row):
         return "waiting"
     if row["status"] == "choose":
         return "waiting on a pick"
-    if row["status"] == "confirm":
-        return "waiting on review"
     if row["destination"] == "blocked":
         return "blocked"
-    if row["label"] and row["label"].startswith("KEPT ON THE BOX"):
+    if row["label"] and row["label"].startswith("KEPT ON DEVICE"):
         return "refused upstream"
     if row["box_ok"] is None:
         return "not graded"
@@ -293,6 +283,16 @@ def masking_list(_user=Depends(partner)):
 def masking_default(body: dict, _user=Depends(partner)):
     db.run("UPDATE mask_items SET enabled=? WHERE grp='default' AND key=?", int(bool(body.get("on"))), str(body.get("name")))
     return masking_list(_user)
+
+
+@app.post("/api/masking/rule")
+def masking_rule(body: dict, user=Depends(partner)):
+    text = str(body.get("text") or "").strip()
+    if not text:
+        raise HTTPException(400, "Empty rule")
+    reply = masking.apply_rule(user["id"], text)
+    audit.append(user["id"], "mask.rule", None, f"{user['name']} changed the masking list.")
+    return {"reply": reply, "items": masking_list(user)}
 
 
 @app.post("/api/day/start")

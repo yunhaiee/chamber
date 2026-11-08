@@ -16,7 +16,7 @@ TAG_NAME = {
     "client": "CLIENT", "email": "EMAIL", "phone": "PHONE", "case": "CASE", "api_key": "KEY", "token": "TOKEN",
     "password": "PASSWORD", "gov_id": "ID", "card": "CARD", "bank": "ACCOUNT", "people_full": "PERSON",
     "first_names": "PERSON", "last_names": "PERSON", "companies": "COMPANY", "addresses": "ADDRESS", "dates": "DATE",
-    "money": "AMOUNT", "term": "TERM",
+    "money": "AMOUNT", "numbers": "NUMBER", "term": "TERM",
 }
 NOTE = (
     "Some values are replaced by placeholders like [CLIENT_1] or [PERSON_1]. Treat each one as the real value: "
@@ -25,7 +25,7 @@ NOTE = (
 RULE_CHOICES = {
     "people_full": "people's full names", "first_names": "first names", "last_names": "last names",
     "companies": "companies", "addresses": "addresses", "dates": "dates", "money": "money amounts",
-    "other": "something else",
+    "numbers": "all numbers", "other": "something else",
 }
 
 
@@ -76,6 +76,7 @@ PATTERNS = {
         r"|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:,?\s+\d{4})?\b"
     ),
     "money": re.compile(r"\$\s?\d[\d,]*(?:\.\d+)?k?\b|\b\d[\d,]*(?:\.\d+)?\s?dollars\b", re.I),
+    "numbers": re.compile(r"(?<![\w.,-])\d[\d,.]*(?!\w)"),
     "companies": re.compile(r"\b(?:[A-Z][a-z]+\s+){1,3}(?:Inc|LLC|Corp|Ltd|Co)\b\.?"),
 }
 GROUP_PATTERNS = {
@@ -117,7 +118,7 @@ def _spans(text, items, find_people):
         if item["grp"] != "added" or not item["enabled"]:
             continue
         key = item["key"]
-        if key in ("addresses", "dates", "money", "companies"):
+        if key in ("addresses", "dates", "money", "companies", "numbers"):
             for m in PATTERNS[key].finditer(text):
                 add(m.start(), m.end(), key)
         elif key == "term":
@@ -187,14 +188,15 @@ def restore(text, keymap):
 
 RULE_START = re.compile(r"^\s*(?:please\s+)?(mask|hide|redact|anonymi[sz]e|stop masking|don'?t send|do not send|never send)\b", re.I)
 RULE_ANY = re.compile(r"\b(don'?t|do not|never)\b.{0,60}?\b(send|share)\b.{0,60}?\b(cloud|claude|outside)\b", re.I | re.S)
+RULE_ADD = re.compile(r"\b(?:add|create|new)\b.{0,40}\bmask(?:ing)?\b|\b(?:from now on|always)\b.{0,40}\b(?:mask|hide|redact)\b|\bmask(?:ing)? (?:rule|all|every)\b", re.I | re.S)
 OFF_WORDS = re.compile(r"\b(stop|unmask|turn off)\b", re.I)
 
 
 def is_privacy_rule(text):
-    return len(text) < 300 and bool(RULE_START.search(text) or RULE_ANY.search(text))
+    return len(text) < 300 and bool(RULE_START.search(text) or RULE_ANY.search(text) or RULE_ADD.search(text))
 
 
-DEFAULT_WORDS = {"client": r"client|part(?:y|ies)", "email": r"e-?mail", "phone": r"phone", "case": r"case number"}
+DEFAULT_WORDS = {"client": r"\bclients?\b|\bpart(?:y|ies)\b", "email": r"\be-?mails?\b", "phone": r"\bphones?\b", "case": r"\bcase numbers?\b"}
 
 
 def apply_rule(user_id, text):
@@ -216,6 +218,12 @@ def apply_rule(user_id, text):
                 return f"Masking turned off: {label.lower()}."
         return "Only default items can be turned off."
 
+    for key, words in DEFAULT_WORDS.items():
+        if re.search(words, text, re.I) and not OFF_WORDS.search(text):
+            label = next(l for k, l in DEFAULTS if k == key)
+            db.run("UPDATE mask_items SET enabled=1 WHERE grp='default' AND key=?", key)
+            return f"Already masked: {label.lower()}."
+
     terms = re.findall(r"[\"“']([^\"”']{2,})[\"”']", text)
     if not terms:
         terms = [t for t in re.findall(r"(?<=[a-z,] )[A-Z][\w-]+(?: [A-Z][\w-]+)*", text)]
@@ -225,7 +233,7 @@ def apply_rule(user_id, text):
                label, user_id, text, json.dumps(terms), db.now())
         return f"Added to masking: {label}."
     if confidence < 0.5 or choice == "other":
-        return "Which should I mask: people's names, companies, addresses, dates or money amounts?"
+        return "Which should I mask: people's names, companies, addresses, dates, money amounts or all numbers?"
 
     label = RULE_CHOICES[choice]
     existing = db.one("SELECT id FROM mask_items WHERE grp='added' AND key=?", choice)

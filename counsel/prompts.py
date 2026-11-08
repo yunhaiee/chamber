@@ -22,9 +22,16 @@ BY_KIND = {
 SUMMARIES = ("summarize_deposition", "summarize_instrument")
 
 
+TOKEN_CAP = {
+    "privilege_tag": 40, "extract_dates": 120, "extract_beneficiaries": 200, "compute_distribution": 200,
+    "public_research": 200, "summarize_deposition": 450, "summarize_instrument": 450,
+    "draft_letter": 600, "draft_client_letter": 600,
+}
+
+
 def max_tokens(kind):
-    """A research shadow is one sentence; left at 900 it rambles for 14 seconds and fails the same way."""
-    return 200 if kind == "public_research" else None
+    """The queue runs one answer at a time, so one rambling answer holds up everyone behind it."""
+    return TOKEN_CAP.get(kind)
 
 
 def summary_limit(doc_len):
@@ -40,7 +47,7 @@ def build(kind, text, docs):
         parts.append(
             f"The summary must be under {limit} characters in total. Each bullet is one short line of facts. "
             "Leave out logistics, objections, lunch, contact details and follow-up tasks. Write numbers exactly as they appear. "
-            "Put the bullets in one string separated by newlines. "
+            "Put the bullets in one string separated by newlines. Say who gave the instruction inside that bullet. Do not add a separate bullet for names. "
         )
     if kind in BY_KIND:
         parts.append(BY_KIND[kind] + " ")

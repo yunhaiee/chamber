@@ -70,35 +70,23 @@ def send_prepared(req):
     return router.handle(person(req["user"]), req["text"], ids)
 
 
-def test_three_good_reviews_earn_proven_and_fourth_is_not_draft(stub):
-    reqs = prepared.for_user("maya", "summarize_deposition")
-    labels = []
-    for req in reqs[:3]:
+def test_privileged_work_is_simply_produced_on_device(stub):
+    for req in prepared.for_user("maya", "summarize_deposition")[:4]:
         stub.answer = passing_answer(req)
         sent = send_prepared(req)
-        assert sent["ask"] == "confirm"
-        labels.append(router.record_review(person("maya"), sent["id"], "good")["label"])
-    assert "DRAFT 1/3" in labels[0] and "DRAFT 3/3" in labels[2]
-    assert states.current("maya", "summarize_deposition") == "PROVEN"
-    stub.answer = passing_answer(reqs[3])
-    fourth = send_prepared(reqs[3])
-    assert fourth["ask"] is None and "DRAFT" not in fourth["label"]
-
-
-def test_needs_a_lawyer_review_goes_to_the_queue(stub):
-    req = prepared.for_user("maya", "summarize_deposition")[0]
-    stub.answer = passing_answer(req)
-    sent = send_prepared(req)
-    result = router.record_review(person("maya"), sent["id"], "lawyer")
-    assert result["label"].startswith("A LAWYER")
-    assert db.one("SELECT passed FROM evidence")["passed"] == 0
+        assert sent["ask"] is None and sent["label"].startswith("ON DEVICE ·")
+        assert "DRAFT" not in sent["label"]
+    assert states.current("maya", "summarize_deposition") == "LOCAL"
+    assert db.one("SELECT COUNT(*) n FROM evidence")["n"] == 0
+    assert db.one("SELECT COUNT(*) n FROM cloud_payloads")["n"] == 0
 
 
 def test_automatic_day_uses_the_answer_key_not_a_person(stub):
-    req = prepared.for_user("maya", "summarize_deposition")[0]
+    req = prepared.for_user("maya", "public_research")[1]
     stub.answer = passing_answer(req)
-    sent = router.handle(person("maya"), req["text"], [doc_id(req["doc_title"])], source="day")
+    sent = router.handle(person("maya"), req["text"], [], source="day")
     assert sent["ask"] is None
+    join_shadows()
     assert db.one("SELECT passed FROM evidence")["passed"] == 1
 
 
@@ -120,19 +108,19 @@ def test_picking_local_ticks_and_picking_claude_misses(stub):
     sent = research_pick(stub)
     local_letter = "a" if sent["options"]["a"] == "the box says 4 years" else "b"
     result = router.record_pick(person("maya"), sent["id"], local_letter)
-    assert result["label"].startswith("ON THE BOX · SHADOW 1/3")
+    assert result["label"].startswith("ON DEVICE · SHADOW 1/3")
     assert db.one("SELECT passed FROM evidence ORDER BY id DESC")["passed"] == 1
     sent = research_pick(stub)
     claude_letter = "b" if sent["options"]["a"] == "the box says 4 years" else "a"
     result = router.record_pick(person("maya"), sent["id"], claude_letter)
-    assert result["label"].startswith("CLAUDE")
+    assert result["label"].startswith("CLOUD")
     assert db.one("SELECT passed FROM evidence ORDER BY id DESC")["passed"] == 0
 
 
 def test_neither_goes_to_human_approval(stub):
     sent = research_pick(stub)
     result = router.record_pick(person("maya"), sent["id"], "neither")
-    assert result["label"].startswith("A LAWYER")
+    assert result["label"].startswith("HUMAN")
     assert db.one("SELECT reason FROM queue")["reason"] == "neither answer was right"
 
 
@@ -149,11 +137,11 @@ def test_one_person_cannot_answer_anothers_pick(stub):
     assert router.record_pick(person("daniel"), sent["id"], "a") is None
 
 
-def test_parse_failure_is_an_ordinary_fail(stub):
-    req = prepared.for_user("maya", "summarize_deposition")[0]
+def test_parse_failure_on_public_work_is_a_miss_and_cloud_answer_stands(stub):
+    req = next(r for r in prepared.for_user("maya", "public_research") if "Harlow" in r["text"])
     stub.answer = "not json at all"
     result = send_prepared(req)
-    assert result["status"] == "done"
+    assert result["ask"] is None and result["status"] == "done" and result["destination"] == "claude"
     assert db.one("SELECT passed FROM evidence")["passed"] == 0
 
 
@@ -170,9 +158,9 @@ def test_pasted_privileged_email_is_refused_upstream(stub):
     stub.priv = 0.97
     result = router.handle(person("maya"), "Research question: what is the limit? Pasted email: Maya, please keep this between us, the alarm log was deleted.")
     assert result["destination"] == "box"
-    assert result["label"].startswith("KEPT ON THE BOX · privileged 0.97")
+    assert result["label"].startswith("KEPT ON DEVICE · privileged 0.97")
     assert db.one("SELECT COUNT(*) n FROM cloud_payloads")["n"] == 0
-    assert "Refused to send it to Claude" in db.one("SELECT sentence FROM audit ORDER BY id DESC LIMIT 1")["sentence"]
+    assert "Refused to send it to the cloud" in db.one("SELECT sentence FROM audit ORDER BY id DESC LIMIT 1")["sentence"]
 
 
 def test_privilege_marker_is_a_hard_rule(stub):
@@ -196,7 +184,7 @@ def test_settlement_goes_to_a_lawyer_with_no_ai(stub):
     stub.kind = "advice"
     calls_before = len([p for p in stub.prompts if p[0] != "d1"])
     result = router.handle(person("maya"), "Should we accept Brightline's offer?")
-    assert result["label"] == "A LAWYER · Added to Ruth Abernathy's queue."
+    assert result["label"] == "HUMAN · Added to Ruth Abernathy's queue."
     assert len([p for p in stub.prompts if p[0] != "d1"]) == calls_before
     assert db.one("SELECT reason FROM queue")["reason"] == "judgment 0.91"
 
@@ -246,19 +234,21 @@ def fail_row(user, kind, n):
         states.record(user, kind, False, i)
 
 
-def test_twist_path_proven_to_draft_to_lawyer(stub):
-    states.ensure("maya", "extract_dates", "privileged")
+def test_public_row_earns_device_then_loses_it(stub):
+    states.ensure("maya", "public_research", "public")
     for i in range(3):
-        states.record("maya", "extract_dates", True, i)
-    assert states.current("maya", "extract_dates") == "PROVEN"
-    fail_row("maya", "extract_dates", 2)
-    assert states.current("maya", "extract_dates") == "DRAFT"
-    assert states.streak("maya", "extract_dates") == 0
+        states.record("maya", "public_research", True, i)
+    assert states.current("maya", "public_research") == "PROVEN"
+    fail_row("maya", "public_research", 2)
+    assert states.current("maya", "public_research") == "SHADOW"
     assert db.one("SELECT COUNT(*) n FROM evidence WHERE cleared=0")["n"] == 0
-    fail_row("maya", "extract_dates", 2)
-    assert states.current("maya", "extract_dates") == "DRAFT"
-    fail_row("maya", "extract_dates", 1)
-    assert states.current("maya", "extract_dates") == "LAWYER"
+
+
+def test_privileged_rows_never_earn_or_lose(stub):
+    states.ensure("maya", "extract_dates", "privileged")
+    fail_row("maya", "extract_dates", 5)
+    assert states.current("maya", "extract_dates") == "LOCAL"
+    assert db.one("SELECT COUNT(*) n FROM evidence")["n"] == 0
 
 
 def test_public_row_fails_out_to_claude(stub):

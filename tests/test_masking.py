@@ -24,6 +24,7 @@ def test_rule_detection_includes_dont_send_and_excludes_long_text():
     assert masking.is_privacy_rule("Don't send people's names to the cloud.")
     assert masking.is_privacy_rule("Never share the addresses with Claude.")
     assert masking.is_privacy_rule("mask the dates")
+    assert masking.is_privacy_rule("add a new masking rule. from now on mask all numbers")
     assert not masking.is_privacy_rule("What is the time limit for fraud?")
     assert not masking.is_privacy_rule("Mask " + "x" * 300)
 

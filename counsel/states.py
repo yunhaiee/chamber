@@ -7,7 +7,8 @@ TRIALS = 3
 REQUIRED = {"low": TRIALS, "medium": TRIALS}
 _lock = threading.Lock()
 
-COLUMN = {"DRAFT": "box", "PROVEN": "box", "SHADOW": "claude", "CLAUDE": "claude", "LAWYER": "lawyer"}
+COLUMN = {"LOCAL": "box", "PROVEN": "box", "SHADOW": "claude", "CLAUDE": "claude", "LAWYER": "lawyer"}
+DISPLAY = {"LOCAL": "ON DEVICE", "CLAUDE": "CLOUD", "LAWYER": "HUMAN"}
 
 
 def model():
@@ -36,7 +37,7 @@ def ensure(user, kind, path):
         if prepared.PATH.get(kind, ("", ""))[1] == "never":
             state = "LAWYER"
         else:
-            state = "SHADOW" if path == "public" else "DRAFT"
+            state = "SHADOW" if path == "public" else "LOCAL"
         db.run("INSERT INTO row_events (user, kind, model, from_state, to_state, reason, ts) VALUES (?,?,?,?,?,?,?)",
                user, kind, model(), None, state, "first request", db.now())
         return state
@@ -57,9 +58,9 @@ def streak(user, kind):
 
 def word(user, kind, state=None):
     state = state or current(user, kind)
-    if state in ("DRAFT", "SHADOW"):
-        return f"{state} {min(streak(user, kind), required(kind))}/{required(kind)}"
-    return state
+    if state == "SHADOW":
+        return f"SHADOW {min(streak(user, kind), required(kind))}/{required(kind)}"
+    return DISPLAY.get(state, state)
 
 
 def origin(user, kind):
@@ -79,21 +80,21 @@ def _move(user, kind, from_state, to_state, reason, sentence):
 
 
 def record(user, kind, passed, request_id):
-    """Add one graded result and apply earning, losing and failing out."""
+    """Add one result for public work and move the row. Privileged work is simply produced."""
     with _lock:
+        state = current(user, kind)
+        if state not in ("SHADOW", "CLAUDE", "PROVEN"):
+            return
         db.run("INSERT INTO evidence (user, kind, model, passed, request_id, ts) VALUES (?,?,?,?,?,?)",
                user, kind, model(), int(passed), request_id, db.now())
-        state = current(user, kind)
         live = _live(user, kind)
         label = prepared.label_for(user, kind)
         matter = _matter_name(user)
-        public = origin(user, kind) == "SHADOW"
-        fallback = "SHADOW" if public else "DRAFT"
 
-        if state in ("DRAFT", "SHADOW", "CLAUDE"):
+        if state in ("SHADOW", "CLAUDE"):
             need = required(kind)
             if len(live) >= need and all(r["passed"] for r in live[-need:]):
-                _move(user, kind, state, "PROVEN", "earned", f"{label} for {matter} is proven. The box passed {need} in a row.")
+                _move(user, kind, state, "PROVEN", "earned", f"{label} for {matter} moved on device. It passed {need} in a row.")
                 return
 
         if state == "PROVEN":
@@ -101,16 +102,12 @@ def record(user, kind, passed, request_id):
             fails = sum(1 for r in recent if not r["passed"])
             if fails >= 2:
                 db.run("UPDATE evidence SET cleared=1 WHERE user=? AND kind=? AND model=?", user, kind, model())
-                _move(user, kind, state, fallback, "lost", f"{label} for {matter} lost proven status. The box failed {fails} of its last {len(recent)} checks.")
+                _move(user, kind, state, "SHADOW", "lost", f"{label} for {matter} lost proven status. The on-device model failed {fails} of its last {len(recent)} checks.")
             return
 
-        if state in ("DRAFT", "SHADOW") and len(live) >= TRIALS:
+        if state == "SHADOW" and len(live) >= TRIALS:
             passes = sum(1 for r in live if r["passed"])
-            fails = len(live) - passes
-            if public:
-                _move(user, kind, state, "CLAUDE", "failed out", f"{label} for {matter} goes to Claude. The box passed {passes} of {len(live)} trials.")
-            elif passes * 2 < len(live):
-                _move(user, kind, state, "LAWYER", "failed out", f"{label} for {matter} moved to a lawyer. The box failed {fails} of {len(live)} checks, and the cloud isn't allowed to see it.")
+            _move(user, kind, state, "CLAUDE", "failed out", f"{label} for {matter} goes to the cloud. The on-device model passed {passes} of {len(live)} trials.")
 
 
 def rows_for(user):
@@ -127,6 +124,7 @@ def rows_for(user):
             dots.append({"ok": bool(e["passed"]), "divider": divider})
         out.append({
             "kind": kind, "label": prepared.label_for(user, kind), "state": word(user, kind, state),
-            "base": state, "column": COLUMN[state], "progress": streak(user, kind), "needed": required(kind), "dots": dots,
+            "base": state, "column": COLUMN[state], "progress": streak(user, kind),
+            "needed": 0 if state in ("LOCAL", "LAWYER") else required(kind), "dots": dots,
         })
     return out

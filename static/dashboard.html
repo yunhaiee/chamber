@@ -5,9 +5,9 @@
 <script src="/static/common.js"></script>
 <script>
 const root = document.getElementById('root');
-const TABS = [['board', 'Board'], ['requests', 'Requests'], ['queue', 'Lawyer queue'], ['audit', 'Audit log'], ['masking', 'Masking']];
-const COLUMNS = [['box', 'On the box'], ['claude', 'Claude'], ['lawyer', 'A lawyer']];
-const DEST_WORD = { box: 'On the box', claude: 'Claude', lawyer: 'A lawyer', blocked: 'Blocked' };
+const TABS = [['board', 'Board'], ['requests', 'Requests'], ['queue', 'Human queue'], ['audit', 'Audit log'], ['masking', 'Masking']];
+const COLUMNS = [['box', 'On device'], ['claude', 'Cloud'], ['lawyer', 'Human']];
+const DEST_WORD = { box: 'On device', claude: 'Cloud', lawyer: 'Human', blocked: 'Blocked' };
 const ui = { tab: 'board', selected: null, pinned: false, person: '', auditUser: '', auditDest: '', payload: null, seenMask: null, last: {} };
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -74,7 +74,7 @@ async function renderDetail(id) {
   const data = await api(`/api/requests/${id}`);
   const key = data.key && Object.keys(data.key).length ? Object.entries(data.key).map(([t, v]) => `<div><span class="tag">${esc(t)}</span> ${esc(v)}</div>`).join('') : '<div class="muted">None</div>';
   const cloudExtra = data.cloud ? `<div class="eyebrow">Key</div><div>${key}</div><div class="eyebrow" style="margin-top:10px">Shown to the person</div><div class="mono">${esc(data.cloud.answer)}</div>` : '';
-  holder.innerHTML = `<div class="detail">${columnHtml('Box', data.box, data, 'box')}<div>${columnHtml('Claude', data.cloud, data, 'cloud')}${cloudExtra}</div></div>`;
+  holder.innerHTML = `<div class="detail">${columnHtml('On device', data.box, data, 'box')}<div>${columnHtml('Cloud', data.cloud, data, 'cloud')}${cloudExtra}</div></div>`;
 }
 
 function renderRequests(data) {
@@ -84,8 +84,8 @@ function renderRequests(data) {
     document.getElementById('person').onchange = ev => { ui.person = ev.target.value; ui.last = {}; tick(); };
   }
   document.getElementById('person').value = ui.person;
-  document.getElementById('reqs').innerHTML = `<table><tr class="eyebrow"><th>Person</th><th>Kind</th><th>Destination</th><th>Time</th><th>Result</th><th>Masked</th><th>d1</th><th></th></tr>
-    ${data.requests.slice(0, 40).map(r => `<tr class="pick ${r.id === ui.selected ? 'chosen' : ''}" data-id="${r.id}"><td>${esc(r.name)}</td><td>${esc(r.label)}</td><td>${destHtml(r.destination)}</td><td>${clock(r.ts)}</td>
+  document.getElementById('reqs').innerHTML = `<table><tr class="eyebrow"><th>Task</th><th>Person</th><th>Destination</th><th>Time</th><th>Result</th><th>Masked</th><th>d1</th><th></th></tr>
+    ${data.requests.slice(0, 40).map(r => `<tr class="pick ${r.id === ui.selected ? 'chosen' : ''}" data-id="${r.id}"><td>${esc(r.label)}</td><td>${esc(r.name)}</td><td>${destHtml(r.destination)}</td><td>${clock(r.ts)}</td>
       <td class="${r.result.startsWith('failed') || r.result === 'blocked' ? 'fail' : ''}">${esc(r.result)}</td><td>${r.tags || ''}</td><td class="muted">${r.priv != null ? `priv ${r.priv.toFixed(2)} · judg ${r.judg.toFixed(2)}` : ''}</td><td class="muted">${r.auto ? 'auto' : ''}</td></tr>`).join('')}</table>`;
   document.querySelectorAll('tr.pick').forEach(tr => tr.onclick = () => { ui.selected = Number(tr.dataset.id); ui.pinned = true; ui.last.detail = null; tick(); });
   if (!ui.pinned && data.latest_chat && data.latest_chat !== ui.selected && data.latest_chat !== ui.closedAt) ui.selected = data.latest_chat;
@@ -93,7 +93,7 @@ function renderRequests(data) {
 
 function renderQueue(items) {
   document.getElementById('main').innerHTML = items.length
-    ? `<table><tr class="eyebrow"><th>Who</th><th>Kind</th><th>When</th><th>Why</th></tr>${items.map(q => `<tr><td>${esc(q.name)}</td><td>${esc(q.label || q.kind)}</td><td>${clock(q.ts)}</td><td>${esc(q.reason)}</td></tr>`).join('')}</table>`
+    ? `<table><tr class="eyebrow"><th>Task</th><th>Who</th><th>When</th><th>Why</th></tr>${items.map(q => `<tr><td>${esc(q.label || q.kind)}</td><td>${esc(q.name)}</td><td>${clock(q.ts)}</td><td>${esc(q.reason)}</td></tr>`).join('')}</table>`
     : '<div class="muted">Empty</div>';
 }
 
@@ -112,7 +112,7 @@ function renderAudit(data) {
     };
   }
   const t = data.totals;
-  document.getElementById('totals').innerHTML = `Requests ${t.requests} · On the box ${t.box} · Claude ${t.claude} · A lawyer ${t.lawyer} · Blocked ${t.blocked} · <span class="${t.privileged_sent ? 'fail' : ''}">Privileged text sent to Claude ${t.privileged_sent}</span>`;
+  document.getElementById('totals').innerHTML = `Requests ${t.requests} · On device ${t.box} · Cloud ${t.claude} · Human ${t.lawyer} · Blocked ${t.blocked} · <span class="${t.privileged_sent ? 'fail' : ''}">Privileged text sent to cloud ${t.privileged_sent}</span>`;
   document.getElementById('intact').innerHTML = data.intact ? 'Log intact' : `<span class="fail">Entry ${data.first_bad} fails verification</span>`;
   document.getElementById('entries').innerHTML = data.entries.map(e => `<div class="entry"><time>${clock(e.ts)}</time><div>${esc(e.sentence)}${e.payload_id ? ` <button class="muted" style="text-decoration:underline" data-p="${e.payload_id}">What was sent</button>` : ''}</div></div>`).join('');
   document.querySelectorAll('[data-p]').forEach(b => b.onclick = async () => {
@@ -131,7 +131,21 @@ function renderMasking(items) {
     return `<div class="item ${fresh ? 'flash' : ''}" title="${esc(i.words || '')}"><span>${esc(i.label)}</span>${right}</div>`;
   };
   const group = (name, grp) => { const list = items.filter(i => i.grp === grp); return list.length ? `<div class="group"><div class="eyebrow">${name}</div>${list.map(row).join('')}</div>` : ''; };
-  document.getElementById('main').innerHTML = group('Always', 'always') + group('Default', 'default') + group('Added', 'added');
+  if (!document.getElementById('masklist')) {
+    document.getElementById('main').innerHTML = `<form class="ruleform" id="ruleform"><input id="ruletext" placeholder="Add a rule in plain words, like: mask all numbers" autocomplete="off"><button>Add</button></form><div class="small" id="rulereply"></div><div id="masklist"></div>`;
+    document.getElementById('ruleform').onsubmit = async ev => {
+      ev.preventDefault();
+      const box = document.getElementById('ruletext');
+      const text = box.value.trim();
+      if (!text) return;
+      box.value = '';
+      document.getElementById('rulereply').textContent = '…';
+      const r = await post('/api/masking/rule', { text });
+      document.getElementById('rulereply').textContent = r.reply;
+      ui.last = {}; tick();
+    };
+  }
+  document.getElementById('masklist').innerHTML = group('Always', 'always') + group('Default', 'default') + group('Added', 'added');
   document.querySelectorAll('[data-mask]').forEach(b => b.onclick = async () => { await post('/api/masking/default', { name: b.dataset.mask, on: b.dataset.on === '1' }); ui.last = {}; tick(); });
 }
 

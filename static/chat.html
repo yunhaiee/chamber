@@ -7,13 +7,14 @@
 const root = document.getElementById('root');
 const SHORT = { summarize_deposition: 'Summarize deposition', extract_dates: 'Pull dates', privilege_tag: 'Privilege tag', draft_letter: 'Letter', public_research: 'Research', advice: 'Advice',
   summarize_instrument: 'Summarize will', extract_beneficiaries: 'Beneficiaries', compute_distribution: 'Distributions', draft_client_letter: 'Client letter' };
+const DOTS = '<div class="thinking" aria-label="Working"><span></span><span></span><span></span></div>';
 const state = { me: null, last: '', tryItems: [], docs: [], attached: [], tried: null, sending: null, expanded: new Set(), rewrites: {} };
 
 function destClass(label) {
   if (!label) return '';
-  if (label.startsWith('CLAUDE')) return 'claude';
-  if (label.startsWith('A LAWYER')) return 'lawyer';
-  if (label.startsWith('ON THE BOX') || label.startsWith('KEPT')) return 'box';
+  if (label.startsWith('CLOUD')) return 'claude';
+  if (label.startsWith('HUMAN')) return 'lawyer';
+  if (label.startsWith('ON DEVICE') || label.startsWith('KEPT')) return 'box';
   return 'blocked';
 }
 
@@ -88,12 +89,11 @@ function messageHtml(m) {
       <div><div class="pair"><div><div class="eyebrow">A</div><div class="reply">${esc(m.options.a)}</div></div><div><div class="eyebrow">B</div><div class="reply">${esc(m.options.b)}</div></div></div>
       <div class="small choices"><button data-pick="a" data-id="${m.id}">A is better</button><button data-pick="b" data-id="${m.id}">B is better</button><button data-pick="both" data-id="${m.id}">Both good</button><button data-pick="neither" data-id="${m.id}">Neither</button></div></div>`;
   }
-  if (m.ask === 'confirm') extra = `<button data-review="good" data-id="${m.id}">Good</button> &nbsp; <button data-review="fixed" data-id="${m.id}">Had to fix</button> &nbsp; <button data-review="lawyer" data-id="${m.id}">Needs a lawyer</button>`;
   return `<div class="ask"><div class="body ${long && !open ? 'short' : ''}" data-open="${m.id}">${esc(m.text)}</div>
       ${m.docs.map(d => `<div class="doc">${esc(d)}</div>`).join('')}</div>
-    <div>${m.reply && !(m.label || '').startsWith('A LAWYER') ? `<div class="reply">${esc(m.reply)}</div>` : ''}
+    <div>${m.reply && !(m.label || '').startsWith('HUMAN') ? `<div class="reply">${esc(m.reply)}</div>` : ''}
       ${m.label ? `<div class="line dest ${cls}">${esc(m.label)}</div>` : ''}
-      ${m.status === 'working' ? '<div class="small">…</div>' : ''}
+      ${m.status === 'working' ? DOTS : ''}
       ${extra ? `<div class="small">${extra}</div>` : ''}
       ${rewrite ? `<div class="rewrite"><div class="mono">${esc(rewrite)}</div><button data-send-rewrite="${m.id}">Send</button></div>` : ''}
     </div>`;
@@ -104,11 +104,10 @@ function render() {
   const log = document.getElementById('log');
   if (!log) return;
   const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
-  log.innerHTML = messages.map(messageHtml).join('') + (state.sending ? `<div class="ask"><div class="body short">${esc(state.sending.text)}</div></div><div class="small">…</div>` : '');
+  log.innerHTML = messages.map(messageHtml).join('') + (state.sending && !messages.some(m => m.status === 'working' && m.text === state.sending.text) ? `<div class="ask"><div class="body short">${esc(state.sending.text)}</div></div>${DOTS}` : '');
   if (nearBottom || state.sending) log.scrollTop = log.scrollHeight;
   log.querySelectorAll('[data-open]').forEach(el => el.onclick = () => { const id = Number(el.dataset.open); state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id); render(); });
   log.querySelectorAll('[data-pick]').forEach(b => b.onclick = async () => { await post('/api/pick', { request_id: Number(b.dataset.id), choice: b.dataset.pick }); state.last = ''; poll(); });
-  log.querySelectorAll('[data-review]').forEach(b => b.onclick = async () => { await post('/api/review', { request_id: Number(b.dataset.id), verdict: b.dataset.review }); state.last = ''; poll(); });
   log.querySelectorAll('[data-fix]').forEach(b => b.onclick = async () => { await post('/api/fix', { request_id: Number(b.dataset.fix) }); b.textContent = 'Recorded'; });
   log.querySelectorAll('[data-rewrite]').forEach(b => b.onclick = async () => { b.textContent = '…'; const r = await post('/api/research-only', { request_id: Number(b.dataset.rewrite) }); state.rewrites[b.dataset.rewrite] = r.text; render(); });
   log.querySelectorAll('[data-send-rewrite]').forEach(b => b.onclick = () => { const id = b.dataset.sendRewrite; const t = state.rewrites[id]; delete state.rewrites[id]; send(t); });

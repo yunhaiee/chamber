@@ -13,12 +13,12 @@ MARKER = re.compile(r"privileged|attorney[- ]client|work product|attorney notes"
 LAWYER_NAME = "Ruth Abernathy"
 ALLOWED_ACTIONS = {"send_email", "file_document"}
 
-BOX_NOTE = "Handled on the box. Nothing left the building."
+BOX_NOTE = "Handled on device. Nothing left the building."
 _spot_lock = threading.Lock()
 
 
 def cloud_name():
-    return "Claude" if llm.has_cloud_key() else "the stand-in"
+    return "the cloud" if llm.has_cloud_key() else "the stand-in"
 
 
 def _update(rid, **fields):
@@ -122,7 +122,7 @@ def _send_cloud(rid, user_row, kind, text, state_word, source):
         audit.append(user_row["id"], "cloud.blocked", "blocked", f"{user_row['name']}'s request was blocked because masking failed. Nothing was sent.")
         return
     except llm.CloudError as e:
-        _update(rid, status="error", notes=f"cloud: {e}", reply="The cloud call failed.", label="CLAUDE · error")
+        _update(rid, status="error", notes=f"cloud: {e}", reply="The cloud call failed.", label="CLOUD · error")
         return
     clients = sum(1 for t in result["tags"] if t.startswith("[CLIENT_"))
     others = result["tag_count"] - clients
@@ -140,35 +140,24 @@ def _send_cloud(rid, user_row, kind, text, state_word, source):
     _update(
         rid, destination="claude", status="done", cloud_in=result["cloud_in"], cloud_out_tags=result["cloud_out_tags"],
         cloud_out=result["cloud_out"], cloud_ms=result["cloud_ms"], keymap=json.dumps(result["keymap"]), notes=notes,
-        reply=result["cloud_out"], shown="cloud", label=f"CLAUDE · {result['cloud_ms'] / 1000:.1f}s",
+        reply=result["cloud_out"], shown="cloud", label=f"CLOUD · {result['cloud_ms'] / 1000:.1f}s",
     )
     _record_actions(rid, result["parsed"], executed=True)
     audit.append(user_row["id"], "request", "claude", sentence, payload_id)
 
 
-def _finish_box(rid, user_row, kind, parsed, ms, state, sentence, refused=False, privileged=None, review=False):
+def _finish_box(rid, user_row, kind, parsed, ms, sentence, refused=False, privileged=None):
     usable = isinstance(parsed, dict) and "answer" in parsed
-    if usable:
-        reply = render(parsed["answer"])
-    else:
-        reply = "The box couldn't produce an answer in the expected form."
-    if refused:
-        label = f"KEPT ON THE BOX · privileged {privileged:.2f}"
-    elif state != "PROVEN":
-        label = f"ON THE BOX · {states.word(user_row['id'], kind, 'DRAFT')} · {ms / 1000:.1f}s"
-    else:
-        label = f"ON THE BOX · {ms / 1000:.1f}s"
-    ask = review and usable and not refused
-    if review and not usable and not refused:
-        states.record(user_row["id"], kind, False, rid)  # nothing to review: an ordinary fail
-    _update(rid, destination="box", status="confirm" if ask else "done", reply=reply, shown="box", label=label)
+    reply = render(parsed["answer"]) if usable else "The on-device model couldn't produce an answer in the expected form."
+    label = f"KEPT ON DEVICE · privileged {privileged:.2f}" if refused else f"ON DEVICE · {ms / 1000:.1f}s"
+    _update(rid, destination="box", status="done", reply=reply, shown="box", label=label)
     _record_actions(rid, parsed, executed=True)
     audit.append(user_row["id"], "request" if not refused else "refused", "blocked" if refused else "box", sentence)
 
 
 def _queue_for_lawyer(rid, user_row, kind, text, title, reason):
     db.run("INSERT INTO queue (request_id, assignee, reason, ts) VALUES (?,?,?,?)", rid, "ruth", reason, db.now())
-    _update(rid, destination="lawyer", status="queued", reply=f"Added to {LAWYER_NAME}'s queue.", label=f"A LAWYER · Added to {LAWYER_NAME}'s queue.")
+    _update(rid, destination="lawyer", status="queued", reply=f"Added to {LAWYER_NAME}'s queue.", label=f"HUMAN · Added to {LAWYER_NAME}'s queue.")
     audit.append(user_row["id"], "request", "lawyer", f"{_ask_text(user_row['name'], kind, title, text)} Sent to {LAWYER_NAME}'s queue. No AI answered.")
 
 
@@ -183,10 +172,10 @@ def view(rid):
     return {
         "id": row["id"], "text": row["text"], "docs": titles, "reply": row["reply"], "label": row["label"],
         "destination": row["destination"], "status": row["status"], "shown": row["shown"],
-        "can_fix": row["shown"] == "box" and row["status"] == "done",
-        "ask": {"choose": "choose", "confirm": "confirm"}.get(row["status"]),
+        "can_fix": row["shown"] == "box" and row["status"] == "done" and row["state_at_time"] == "PROVEN",
+        "ask": "choose" if row["status"] == "choose" else None,
         "options": ({k: v for k, v in json.loads(row["options"]).items() if k in ("a", "b")} if row["status"] == "choose" and row["options"] else None),
-        "research_only": bool(row["label"] and row["label"].startswith("KEPT ON THE BOX")),
+        "research_only": bool(row["label"] and row["label"].startswith("KEPT ON DEVICE")),
     }
 
 
@@ -203,7 +192,7 @@ def handle(user_row, text, doc_ids=(), source="chat"):
     # 1. A privacy rule never leaves the box.
     if source == "chat" and masking.is_privacy_rule(text):
         reply = masking.apply_rule(user_id, text)
-        _update(rid, kind="privacy_rule", destination="box", status="done", reply=reply, label="ON THE BOX")
+        _update(rid, kind="privacy_rule", destination="box", status="done", reply=reply, label="ON DEVICE")
         audit.append(user_id, "mask.rule", "box", f"{user_row['name']} changed the masking list. {BOX_NOTE}")
         return view(rid)
 
@@ -279,35 +268,27 @@ def handle(user_row, text, doc_ids=(), source="chat"):
         return view(rid)
 
     if is_privileged:
-        if state == "LAWYER":
-            _queue_for_lawyer(rid, user_row, kind, text, title, "the box failed this work; cloud not allowed")
-            return view(rid)
-        ask_person = human and state != "PROVEN"
-        result = _box(rid, user_id, kind, text, bodies, prep, priority, grade=not ask_person)
+        result = _box(rid, user_id, kind, text, bodies, prep, priority, grade=False)
         if result is None:
-            _update(rid, reply="The box is not responding.", label="ON THE BOX · error")
+            _update(rid, reply="The on-device model is not responding.", label="ON DEVICE · error")
             return view(rid)
         parsed, ms, _ok = result
         if prepared.PATH.get(kind, ("", ""))[0] == "public":
-            sentence = f"{user_row['name']}'s research question contained privileged text. Refused to send it to Claude. Handled on the box."
-            _finish_box(rid, user_row, kind, parsed, ms, state, sentence, refused=True, privileged=max(privileged_score, 0.0))
+            sentence = f"{user_row['name']}'s research question contained privileged text. Refused to send it to the cloud. Handled on device."
+            _finish_box(rid, user_row, kind, parsed, ms, sentence, refused=True, privileged=max(privileged_score, 0.0))
             return view(rid)
-        _finish_box(rid, user_row, kind, parsed, ms, state, f"{_ask_text(user_row['name'], kind, title, text)} {BOX_NOTE}", review=ask_person)
+        _finish_box(rid, user_row, kind, parsed, ms, f"{_ask_text(user_row['name'], kind, title, text)} {BOX_NOTE}")
         return view(rid)
 
     # Public path.
-    if state == "PROVEN" or row_path == "privileged":
-        if state == "LAWYER":
-            _queue_for_lawyer(rid, user_row, kind, text, title, "the box failed this work; cloud not allowed")
-            return view(rid)
-        spot = state == "PROVEN" and row_path == "public" and _spot_due(user_id, kind)
-        ask_person = human and state != "PROVEN"
-        result = _box(rid, user_id, kind, text, bodies, prep, priority, grade=not ask_person)
+    if state in ("PROVEN", "LOCAL"):
+        spot = state == "PROVEN" and _spot_due(user_id, kind)
+        result = _box(rid, user_id, kind, text, bodies, prep, priority, grade=state == "PROVEN")
         if result is None:
-            _update(rid, reply="The box is not responding.", label="ON THE BOX · error")
+            _update(rid, reply="The on-device model is not responding.", label="ON DEVICE · error")
             return view(rid)
         parsed, ms, _ok = result
-        _finish_box(rid, user_row, kind, parsed, ms, state, f"{_ask_text(user_row['name'], kind, title, text)} {BOX_NOTE}", review=ask_person)
+        _finish_box(rid, user_row, kind, parsed, ms, f"{_ask_text(user_row['name'], kind, title, text)} {BOX_NOTE}")
         if spot and net.online():
             threading.Thread(target=_spot_check, args=(rid, user_id, text), daemon=True).start()
         return view(rid)
@@ -352,15 +333,14 @@ def _offer_choice(rid, user_id, kind, box_result):
 
 def _settled_label(side, row, progress):
     if side == "local":
-        return f"ON THE BOX · {progress} · {(row['box_ms'] or 0) / 1000:.1f}s"
-    return f"CLAUDE · {progress} · {(row['cloud_ms'] or 0) / 1000:.1f}s"
+        return f"ON DEVICE · {progress} · {(row['box_ms'] or 0) / 1000:.1f}s"
+    return f"CLOUD · {progress} · {(row['cloud_ms'] or 0) / 1000:.1f}s"
 
 
-def _progress(user_id, kind, before):
-    """DRAFT 2/3 as of this answer, even when the row has just become proven."""
+def _progress(user_id, kind):
+    """SHADOW 2/3 as of this answer, even when the row has just moved."""
     state = states.current(user_id, kind)
-    count = states.TRIALS if state == "PROVEN" else states.streak(user_id, kind)
-    return f"{before if before in ('DRAFT', 'SHADOW') else state} {count}/{states.TRIALS}"
+    return f"SHADOW {states.TRIALS if state == 'PROVEN' else states.streak(user_id, kind)}/{states.TRIALS}"
 
 
 def record_pick(user_row, rid, choice):
@@ -382,26 +362,8 @@ def record_pick(user_row, rid, choice):
     states.record(user_id, kind, passed, rid)
     reply = options["local"] if side == "local" else options["cloud"]
     _update(rid, status="done", reply=reply, shown="reviewed", destination="box" if side == "local" else "claude", options=None,
-            label=_settled_label(side, row, _progress(user_id, kind, row["state_at_time"])))
-    audit.append(user_id, "pick", None, f"{user_row['name']} compared two answers and preferred {'the box' if side == 'local' else cloud_name()}{' (both were good)' if choice == 'both' else ''}.")
-    return view(rid)
-
-
-def record_review(user_row, rid, verdict):
-    """The person reviewed a draft from the box."""
-    if verdict not in ("good", "fixed", "lawyer"):
-        return None
-    row = db.one("SELECT * FROM requests WHERE id=? AND user=? AND status='confirm'", rid, user_row["id"])
-    if row is None:
-        return None
-    kind, user_id = row["kind"], user_row["id"]
-    states.record(user_id, kind, verdict == "good", rid)
-    if verdict == "lawyer":
-        _queue_for_lawyer(rid, user_row, kind, row["text"], None, "the person asked for a lawyer's review")
-        return view(rid)
-    _update(rid, status="done", shown="reviewed",
-            label=f"ON THE BOX · {_progress(user_id, kind, row['state_at_time'])} · {(row['box_ms'] or 0) / 1000:.1f}s")
-    audit.append(user_id, "review", None, f"{user_row['name']} reviewed a draft from the box: {'good' if verdict == 'good' else 'had to fix it'}.")
+            label=_settled_label(side, row, _progress(user_id, kind)))
+    audit.append(user_id, "pick", None, f"{user_row['name']} compared two answers and preferred {'the on-device answer' if side == 'local' else 'the cloud answer'}{' (both were good)' if choice == 'both' else ''}.")
     return view(rid)
 
 
