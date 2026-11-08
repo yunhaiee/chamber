@@ -236,7 +236,7 @@ def _tag_doc(rng, i):
     label = TAG_LABELS[i % 3]
     template = TAG_TEMPLATES[label][(i // 3) % 2]
     body = template.format(person=WITNESSES[i % len(WITNESSES)][0], item=rng.choice(TAG_ITEMS), num=rng.randint(10000, 99999)) + "\n"
-    return f"File item {i + 1:02d} for the privilege log", body, {"type": "label", "label": label, "labels": TAG_LABELS}
+    return f"File item {i + 1:02d}", body, {"type": "label", "label": label, "labels": TAG_LABELS}
 
 
 DISCOVERY_ITEMS = [

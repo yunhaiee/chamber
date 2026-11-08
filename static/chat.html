@@ -24,7 +24,7 @@ function shell() {
     <div class="log" id="log"></div>
     <div class="attached" id="attached"></div>
     <div class="tools"><select id="docs"><option value="">Documents ▾</option></select><span id="try"></span></div>
-    <div class="composer"><textarea id="text" placeholder="Message"></textarea><button id="send">Send</button></div>
+    <div class="composer"><textarea id="text" placeholder="Message" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false" spellcheck="false"></textarea><button id="send">Send</button></div>
   </div>`;
   document.getElementById('docs').onchange = ev => {
     const id = Number(ev.target.value); ev.target.value = '';
