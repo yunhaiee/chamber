@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Counsel Box</title><link rel="stylesheet" href="/static/style.css"></head>
+<body><div id="root"></div>
+<script src="/static/common.js"></script>
+<script>
+const root = document.getElementById('root');
+const TABS = [['board', 'Board'], ['requests', 'Requests'], ['queue', 'Lawyer queue'], ['audit', 'Audit log'], ['masking', 'Masking']];
+const COLUMNS = [['box', 'On the box'], ['claude', 'Claude'], ['lawyer', 'A lawyer']];
+const DEST_WORD = { box: 'On the box', claude: 'Claude', lawyer: 'A lawyer', blocked: 'Blocked' };
+const ui = { tab: 'board', selected: null, pinned: false, person: '', auditUser: '', auditDest: '', payload: null, seenMask: null, last: {} };
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function shell() {
+  root.innerHTML = `<div class="top"><strong>Counsel Box</strong><span id="tabs"></span><span class="status" id="status"></span></div><main id="main"></main>`;
+  renderTabs();
+}
+function renderTabs() {
+  const el = document.getElementById('tabs');
+  el.innerHTML = TABS.map(([id, name]) => `<button class="tab ${ui.tab === id ? 'on' : ''}" data-tab="${id}">${name}</button>`).join(' &nbsp;&nbsp; ');
+  el.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
+}
+function go(tab) { ui.tab = tab; ui.last = {}; renderTabs(); document.getElementById('main').innerHTML = ''; tick(); }
+
+function dots(row) {
+  const proven = row.base === 'PROVEN';
+  const slots = Math.min(12, Math.max(row.needed, row.dots.length));
+  let out = '';
+  row.dots.forEach(d => {
+    if (d.divider) out += '<span class="divider"></span>';
+    out += `<span class="dot ${d.ok ? 'pass' + (proven ? ' proven' : '') : 'miss'}"></span>`;
+  });
+  for (let i = row.dots.length; i < slots; i++) out += '<span class="dot"></span>';
+  return `<span class="dots">${out}</span>`;
+}
+
+function renderBoard(data) {
+  const main = document.getElementById('main');
+  const before = new Map();
+  main.querySelectorAll('[data-row]').forEach(el => before.set(el.dataset.row, { rect: el.getBoundingClientRect(), col: el.dataset.col }));
+  main.innerHTML = data.people.map(p => {
+    const counts = COLUMNS.map(([c, n]) => `${n} ${p.rows.filter(r => r.column === c).length}`).join(' · ');
+    return `<section class="band"><div class="eyebrow">${esc(p.name)} &nbsp; ${counts}</div><div class="cols">
+      ${COLUMNS.map(([c, n]) => `<div><div class="dest ${c}">${n}</div>
+        ${p.rows.filter(r => r.column === c).map(r => `<div class="row" data-row="${p.user}/${r.kind}" data-col="${c}">
+          <span class="name">${esc(r.label)}</span><span class="meta">${dots(r)}<span class="state ${c}">${esc(r.state)}</span></span></div>`).join('')}
+      </div>`).join('')}</div></section>`;
+  }).join('');
+  if (reduced) return;
+  main.querySelectorAll('[data-row]').forEach(el => {
+    const was = before.get(el.dataset.row);
+    if (!was || was.col === el.dataset.col) return;
+    const now = el.getBoundingClientRect();
+    el.animate([{ transform: `translate(${was.rect.left - now.left}px, ${was.rect.top - now.top}px)` }, { transform: 'none' }], { duration: 650, easing: 'ease-in-out' });
+  });
+}
+
+function destHtml(d) { return d ? `<span class="dest ${d}">${DEST_WORD[d] || d}</span>` : ''; }
+
+function columnHtml(title, side, data, kind) {
+  if (!side) {
+    const d1 = data.d1 ? `priv ${data.d1.privileged.toFixed(2)} · judg ${data.d1.judgment.toFixed(2)}` : 'd1 unavailable';
+    const rules = data.hard_rules.length ? ` · ${data.hard_rules.join(', ')}` : '';
+    return `<div><h3>${title}</h3><div class="muted">Not sent</div><div class="small">${esc(d1 + rules)}</div></div>`;
+  }
+  return `<div><h3>${title}</h3><div class="eyebrow">Received</div><div class="mono">${tagged(side.received)}</div>
+    <div class="eyebrow">Answer</div><div class="mono">${tagged(kind === 'cloud' ? side.answer_with_tags : side.answer)}</div>
+    <div class="small">${((side.ms || 0) / 1000).toFixed(1)}s${side.checks ? ' · ' + side.checks.items.map(i => `${i.ok ? '' : 'failed '}${esc(i.name)}`).join(', ') : ''}</div></div>`;
+}
+
+async function renderDetail(id) {
+  const holder = document.getElementById('detail');
+  if (!holder || !id) { if (holder) holder.innerHTML = ''; return; }
+  const data = await api(`/api/requests/${id}`);
+  const key = data.key && Object.keys(data.key).length ? Object.entries(data.key).map(([t, v]) => `<div><span class="tag">${esc(t)}</span> ${esc(v)}</div>`).join('') : '<div class="muted">None</div>';
+  const cloudExtra = data.cloud ? `<div class="eyebrow">Key</div><div>${key}</div><div class="eyebrow" style="margin-top:10px">Shown to the person</div><div class="mono">${esc(data.cloud.answer)}</div>` : '';
+  holder.innerHTML = `<div class="detail">${columnHtml('Box', data.box, data, 'box')}<div>${columnHtml('Claude', data.cloud, data, 'cloud')}${cloudExtra}</div></div>`;
+}
+
+function renderRequests(data) {
+  const main = document.getElementById('main');
+  if (!document.getElementById('reqs')) {
+    main.innerHTML = `<div class="filters"><span class="eyebrow">Person</span><select id="person"><option value="">All</option><option value="maya">Maya Chen</option><option value="daniel">Daniel Osei</option></select></div><div id="reqs"></div><div id="detail"></div>`;
+    document.getElementById('person').onchange = ev => { ui.person = ev.target.value; ui.last = {}; tick(); };
+  }
+  document.getElementById('person').value = ui.person;
+  document.getElementById('reqs').innerHTML = `<table><tr class="eyebrow"><th>Person</th><th>Kind</th><th>Destination</th><th>Time</th><th>Result</th><th>Masked</th><th>d1</th><th></th></tr>
+    ${data.requests.slice(0, 40).map(r => `<tr class="pick ${r.id === ui.selected ? 'chosen' : ''}" data-id="${r.id}"><td>${esc(r.name)}</td><td>${esc(r.label)}</td><td>${destHtml(r.destination)}</td><td>${clock(r.ts)}</td>
+      <td class="${r.result.startsWith('failed') || r.result === 'blocked' ? 'fail' : ''}">${esc(r.result)}</td><td>${r.tags || ''}</td><td class="muted">${r.priv != null ? `priv ${r.priv.toFixed(2)} · judg ${r.judg.toFixed(2)}` : ''}</td><td class="muted">${r.auto ? 'auto' : ''}</td></tr>`).join('')}</table>`;
+  document.querySelectorAll('tr.pick').forEach(tr => tr.onclick = () => { ui.selected = Number(tr.dataset.id); ui.pinned = true; ui.last.detail = null; tick(); });
+  if (!ui.pinned && data.latest_chat && data.latest_chat !== ui.selected) ui.selected = data.latest_chat;
+}
+
+function renderQueue(items) {
+  document.getElementById('main').innerHTML = items.length
+    ? `<table><tr class="eyebrow"><th>Who</th><th>Kind</th><th>When</th><th>Why</th></tr>${items.map(q => `<tr><td>${esc(q.name)}</td><td>${esc(q.label || q.kind)}</td><td>${clock(q.ts)}</td><td>${esc(q.reason)}</td></tr>`).join('')}</table>`
+    : '<div class="muted">Empty</div>';
+}
+
+function renderAudit(data) {
+  const main = document.getElementById('main');
+  if (!document.getElementById('entries')) {
+    main.innerHTML = `<div class="totals" id="totals"></div><div class="filters"><span class="eyebrow">Person</span>
+      <select id="auser"><option value="">All</option><option value="maya">Maya Chen</option><option value="daniel">Daniel Osei</option></select>
+      <span class="eyebrow">Destination</span><select id="adest"><option value="">All</option>${Object.entries(DEST_WORD).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+      <button id="csv" class="muted">Export</button><span id="intact"></span></div><div id="payload"></div><div id="entries"></div>`;
+    document.getElementById('auser').onchange = ev => { ui.auditUser = ev.target.value; ui.last = {}; tick(); };
+    document.getElementById('adest').onchange = ev => { ui.auditDest = ev.target.value; ui.last = {}; tick(); };
+    document.getElementById('csv').onclick = async () => {
+      const blob = new Blob([await api('/api/audit.csv')], { type: 'text/csv' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'audit.csv'; a.click();
+    };
+  }
+  const t = data.totals;
+  document.getElementById('totals').innerHTML = `Requests ${t.requests} · On the box ${t.box} · Claude ${t.claude} · A lawyer ${t.lawyer} · Blocked ${t.blocked} · <span class="${t.privileged_sent ? 'fail' : ''}">Privileged text sent to Claude ${t.privileged_sent}</span>`;
+  document.getElementById('intact').innerHTML = data.intact ? 'Log intact' : `<span class="fail">Entry ${data.first_bad} fails verification</span>`;
+  document.getElementById('entries').innerHTML = data.entries.map(e => `<div class="entry"><time>${clock(e.ts)}</time><div>${esc(e.sentence)}${e.payload_id ? ` <button class="muted" style="text-decoration:underline" data-p="${e.payload_id}">What was sent</button>` : ''}</div></div>`).join('');
+  document.querySelectorAll('[data-p]').forEach(b => b.onclick = async () => {
+    const p = await api(`/api/payload/${b.dataset.p}`);
+    document.getElementById('payload').innerHTML = `<div class="detail" style="grid-template-columns:1fr"><div><div class="eyebrow">What was sent</div><div class="mono">${tagged(p.user_text)}</div></div></div>`;
+  });
+}
+
+function renderMasking(items) {
+  const known = ui.seenMask;
+  ui.seenMask = new Set(items.map(i => i.id));
+  const row = i => {
+    const fresh = known && !known.has(i.id);
+    const right = i.grp === 'default' ? `<button data-mask="${i.key}" data-on="${i.enabled ? 0 : 1}">${i.enabled ? 'On' : 'Off'}</button>`
+      : i.grp === 'added' ? `<span class="small">${esc(i.added_by)} · ${clock(i.ts)}</span>` : '<span class="small">Fixed</span>';
+    return `<div class="item ${fresh ? 'flash' : ''}" title="${esc(i.words || '')}"><span>${esc(i.label)}</span>${right}</div>`;
+  };
+  const group = (name, grp) => { const list = items.filter(i => i.grp === grp); return list.length ? `<div class="group"><div class="eyebrow">${name}</div>${list.map(row).join('')}</div>` : ''; };
+  document.getElementById('main').innerHTML = group('Always', 'always') + group('Default', 'default') + group('Added', 'added');
+  document.querySelectorAll('[data-mask]').forEach(b => b.onclick = async () => { await post('/api/masking/default', { name: b.dataset.mask, on: b.dataset.on === '1' }); ui.last = {}; tick(); });
+}
+
+function changed(name, value) {
+  const json = JSON.stringify(value);
+  if (ui.last[name] === json) return false;
+  ui.last[name] = json;
+  return true;
+}
+
+async function tick() {
+  try {
+    const board = await api('/api/board');
+    const cloudText = board.cloud.standin ? `Cloud: ${board.cloud.model}` : board.cloud.model;
+    document.getElementById('status').textContent = `${board.box.machine} · ${board.box.models.join(' · ')} · ${board.cloud.online ? 'Online' : 'Offline'} · ${cloudText}`;
+    if (ui.tab === 'board' && changed('board', board.people)) renderBoard(board);
+    if (ui.tab === 'requests') {
+      const data = await api(`/api/requests${ui.person ? `?user=${ui.person}` : ''}`);
+      if (changed('requests', [data, ui.selected])) renderRequests(data);
+      if (ui.selected && changed('detail', [ui.selected, data.requests.find(r => r.id === ui.selected)])) await renderDetail(ui.selected);
+    }
+    if (ui.tab === 'queue') { const q = await api('/api/queue'); if (changed('queue', q)) renderQueue(q); }
+    if (ui.tab === 'audit') {
+      const params = new URLSearchParams(); if (ui.auditUser) params.set('user', ui.auditUser); if (ui.auditDest) params.set('dest', ui.auditDest);
+      const a = await api('/api/audit?' + params); if (changed('audit', a)) renderAudit(a);
+    }
+    if (ui.tab === 'masking') { const m = await api('/api/masking'); if (changed('masking', m)) renderMasking(m); }
+  } catch (e) { if (e.signin) location.reload(); }
+}
+
+document.addEventListener('keydown', ev => {
+  if (ev.target.matches('input, textarea, select')) return;
+  if (ev.key === '1') go('board');
+  if (ev.key === '2') go('requests');
+  if (ev.key === '3') go('audit');
+  if (ev.key === 'm') go('masking');
+  if (ev.key === 'f') post('/api/day/start');
+  if (ev.key === 't') post('/api/twist/start');
+  if (ev.key === 'Escape') { ui.selected = null; ui.pinned = false; ui.last = {}; const d = document.getElementById('detail'); if (d) d.innerHTML = ''; }
+});
+
+signIn(root, 'partner', async () => {
+  const me = await api('/api/me');
+  if (me.role !== 'partner') { location.href = '/chat'; return; }
+  shell();
+  tick();
+  setInterval(tick, 1000);
+});
+</script></body></html>

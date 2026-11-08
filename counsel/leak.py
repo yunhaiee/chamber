@@ -9,7 +9,12 @@ def _words(text):
     return re.findall(r"[a-z0-9$§'-]+", text.lower())
 
 
+_cache = {}
+
+
 def _fixtures():
+    if db.path() in _cache:
+        return _cache[db.path()]
     secrets, emails, grams = set(), set(), set()
     for doc in db.all("SELECT path, privileged FROM documents"):
         path = Path(doc["path"])
@@ -21,6 +26,7 @@ def _fixtures():
         if doc["privileged"]:
             words = _words(body)
             grams.update(" ".join(words[i:i + 8]) for i in range(len(words) - 7))
+    _cache[db.path()] = (secrets, emails, grams)
     return secrets, emails, grams
 
 

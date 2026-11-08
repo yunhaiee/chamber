@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Counsel Box</title><link rel="stylesheet" href="/static/style.css"></head>
+<body><div class="panes" id="panes"></div>
+<script>
+const port = location.port ? ':' + location.port : '';
+document.getElementById('panes').innerHTML =
+  `<iframe title="Maya Chen" src="http://localhost${port}/chat?pane=left"></iframe>` +
+  `<iframe title="Daniel Osei" src="http://127.0.0.1${port}/chat?pane=right"></iframe>`;
+</script></body></html>

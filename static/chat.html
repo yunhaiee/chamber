@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Counsel Box</title><link rel="stylesheet" href="/static/style.css"></head>
+<body><div id="root"></div>
+<script src="/static/common.js"></script>
+<script>
+const root = document.getElementById('root');
+const SHORT = { summarize_deposition: 'Summarize deposition', extract_dates: 'Pull dates', privilege_tag: 'Privilege tag', draft_letter: 'Letter', public_research: 'Research', advice: 'Advice',
+  summarize_instrument: 'Summarize will', extract_beneficiaries: 'Beneficiaries', compute_distribution: 'Distributions', draft_client_letter: 'Client letter' };
+const state = { me: null, last: '', tryItems: [], docs: [], attached: [], tried: null, sending: null, expanded: new Set(), rewrites: {} };
+
+function destClass(label) {
+  if (!label) return '';
+  if (label.startsWith('CLAUDE')) return 'claude';
+  if (label.startsWith('A LAWYER')) return 'lawyer';
+  if (label.startsWith('ON THE BOX') || label.startsWith('KEPT')) return 'box';
+  return 'blocked';
+}
+
+function shell() {
+  root.innerHTML = `<div class="chat">
+    <header><div>${esc(state.me.name)} · ${esc(state.me.matters.map(m => m.name).join(', '))}</div><div id="online" class="muted"></div></header>
+    <div class="log" id="log"></div>
+    <div class="attached" id="attached"></div>
+    <div class="tools"><select id="docs"><option value="">Documents ▾</option></select><span id="try"></span></div>
+    <div class="composer"><textarea id="text" placeholder="Message"></textarea><button id="send">Send</button></div>
+  </div>`;
+  document.getElementById('docs').onchange = ev => {
+    const id = Number(ev.target.value); ev.target.value = '';
+    if (id && !state.attached.includes(id)) state.attached.push(id);
+    showAttached();
+  };
+  const text = document.getElementById('text');
+  text.onkeydown = ev => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); send(); } };
+  text.oninput = () => { if (state.tried && text.value !== state.tried.text) state.tried = null; };
+  document.getElementById('send').onclick = send;
+}
+
+function showAttached() {
+  const el = document.getElementById('attached');
+  el.innerHTML = state.attached.map(id => {
+    const d = state.docs.find(x => x.id === id);
+    return `${esc(d ? d.title : '')} <button data-rm="${id}" class="muted">×</button>`;
+  }).join(' &nbsp; ');
+  el.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { state.attached = state.attached.filter(x => x !== Number(b.dataset.rm)); showAttached(); });
+}
+
+async function loadTry() {
+  state.tryItems = await api('/api/try');
+  document.getElementById('try').innerHTML = state.tryItems.map((t, i) =>
+    `<button class="try" data-i="${i}">${esc(SHORT[t.kind] || t.label)}</button>`).join(' &nbsp; ');
+  document.querySelectorAll('.try').forEach(b => b.onclick = () => {
+    const t = state.tryItems[Number(b.dataset.i)];
+    document.getElementById('text').value = t.text;
+    state.attached = [...t.doc_ids];
+    state.tried = t;
+    showAttached();
+    document.getElementById('text').focus();
+  });
+}
+
+async function send(textOverride) {
+  const box = document.getElementById('text');
+  const text = (typeof textOverride === 'string' ? textOverride : box.value).trim();
+  if (!text || state.sending) return;
+  const docIds = typeof textOverride === 'string' ? [] : state.attached;
+  const tried = typeof textOverride === 'string' ? null : state.tried;
+  state.sending = { text };
+  if (typeof textOverride !== 'string') { box.value = ''; state.attached = []; state.tried = null; showAttached(); }
+  render();
+  try {
+    if (tried) await post('/api/try/used', { kind: tried.kind });
+    await post('/api/chat', { text, doc_ids: docIds });
+    if (tried) await loadTry();
+  } finally { state.sending = null; state.last = ''; poll(); }
+}
+
+function messageHtml(m) {
+  const long = m.text.length > 150;
+  const open = state.expanded.has(m.id);
+  const cls = destClass(m.label);
+  let extra = '';
+  if (m.can_fix) extra += `<button data-fix="${m.id}">I had to fix this</button>`;
+  if (m.research_only) extra += ` &nbsp; <button data-rewrite="${m.id}">Send only the question</button>`;
+  const rewrite = state.rewrites[m.id];
+  return `<div class="ask"><div class="body ${long && !open ? 'short' : ''}" data-open="${m.id}">${esc(m.text)}</div>
+      ${m.docs.map(d => `<div class="doc">${esc(d)}</div>`).join('')}</div>
+    <div>${m.reply && !(m.label || '').startsWith('A LAWYER') ? `<div class="reply">${esc(m.reply)}</div>` : ''}
+      ${m.label ? `<div class="line dest ${cls}">${esc(m.label)}</div>` : ''}
+      ${m.status === 'working' ? '<div class="small">…</div>' : ''}
+      ${extra ? `<div class="small">${extra}</div>` : ''}
+      ${rewrite ? `<div class="rewrite"><div class="mono">${esc(rewrite)}</div><button data-send-rewrite="${m.id}">Send</button></div>` : ''}
+    </div>`;
+}
+
+let messages = [];
+function render() {
+  const log = document.getElementById('log');
+  if (!log) return;
+  const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+  log.innerHTML = messages.map(messageHtml).join('') + (state.sending ? `<div class="ask"><div class="body short">${esc(state.sending.text)}</div></div><div class="small">…</div>` : '');
+  if (nearBottom || state.sending) log.scrollTop = log.scrollHeight;
+  log.querySelectorAll('[data-open]').forEach(el => el.onclick = () => { const id = Number(el.dataset.open); state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id); render(); });
+  log.querySelectorAll('[data-fix]').forEach(b => b.onclick = async () => { await post('/api/fix', { request_id: Number(b.dataset.fix) }); b.textContent = 'Recorded'; });
+  log.querySelectorAll('[data-rewrite]').forEach(b => b.onclick = async () => { b.textContent = '…'; const r = await post('/api/research-only', { request_id: Number(b.dataset.rewrite) }); state.rewrites[b.dataset.rewrite] = r.text; render(); });
+  log.querySelectorAll('[data-send-rewrite]').forEach(b => b.onclick = () => { const id = b.dataset.sendRewrite; const t = state.rewrites[id]; delete state.rewrites[id]; send(t); });
+}
+
+async function poll() {
+  try {
+    const data = await api('/api/chat');
+    document.getElementById('online').textContent = (data.online ? 'Online' : 'Offline') + (data.standin ? ` · Cloud: ${data.cloud}` : '');
+    const snapshot = JSON.stringify(data.messages);
+    if (snapshot !== state.last) { state.last = snapshot; messages = data.messages; render(); }
+  } catch (e) { if (e.signin) location.reload(); }
+}
+
+const pane = new URLSearchParams(location.search).get('pane');
+signIn(root, pane, async () => {
+  state.me = await api('/api/me');
+  if (state.me.role === 'partner') { location.href = '/'; return; }
+  shell();
+  state.docs = await api('/api/docs');
+  const sel = document.getElementById('docs');
+  state.docs.forEach(d => { const o = document.createElement('option'); o.value = d.id; o.textContent = d.title; sel.appendChild(o); });
+  await loadTry();
+  await poll();
+  setInterval(poll, 1000);
+});
+</script></body></html>
