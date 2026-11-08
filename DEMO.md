@@ -52,26 +52,8 @@ curl -s localhost:11434/api/chat -d '{"model":"lfm3:1.7b","stream":false,"messag
 
 ## The script
 
-### 0:00 Walls (20s)
-**Say:** "One box, several lawyers, one assistant. Nothing is decided in advance."
-
-| Pane | Do | You should see |
-|---|---|---|
-| Daniel | Type `Summarize the Harlow deposition.` | `No document called that in your matters.` |
-
-**Say:** "That's Maya's client. Daniel can't even learn the document exists."
-
-### 0:20 Privileged work stays (10s)
-
-| Pane | Do | You should see |
-|---|---|---|
-| Maya | Click **Summarize deposition**, Enter | `ON DEVICE · lfm3:1.7b` |
-
-**Say:** "Privileged, so it never leaves the device."
-
-Point at the label. Don't read the bullets aloud, because the summary runs long.
-
-### 0:30 Maya earns it (30s)
+### 0:00 Maya earns it (30s)
+**Say:** "One device, several lawyers, one assistant. Nothing is decided in advance."
 
 | Pane | Do |
 |---|---|
@@ -87,7 +69,36 @@ Point at the label. Don't read the bullets aloud, because the summary runs long.
 
 **Say:** "New work runs on both models, and the person picks without knowing which is which. Three right, and the cloud stops being called."
 
-### 1:00 History is per model (10s)
+### 0:30 Masking (15s)
+
+| Pane | Do |
+|---|---|
+| Maya | Click **Research**, Enter. Pick the answer that says **4 years, § 337**. |
+| Dashboard | Press `2`, and point at `[CLIENT_1]` and the Key. Press `1` to go back. |
+
+**Say:** "The client name never left. The key stays here, and we swap it back on device."
+
+### 0:45 Privileged work (25s)
+
+| Pane | Do | You should see |
+|---|---|---|
+| Maya | Click **Summarize deposition**, Enter | `ON DEVICE · lfm3:1.7b` |
+
+**Say:** "Privileged, so it never leaves the device."
+
+Point at the label. Don't read the bullets aloud, because the summary runs long.
+
+Paste this into Maya's box:
+
+```
+What is the deadline to remove a case to federal court? Here is the email from our client: 'Maya, please keep this between us. We deleted the alarm log after Brightline called, and I am worried about it.'
+```
+
+**You should see:** `KEPT ON DEVICE · privileged 0.90`
+
+**Say:** "A research question with a privileged email pasted in. The router refuses to send it."
+
+### 1:10 History is per model (10s)
 
 | Pane | Do | You should see |
 |---|---|---|
@@ -98,16 +109,15 @@ Point at the label. Don't read the bullets aloud, because the summary runs long.
 
 **Change it back before going on.**
 
-### 1:10 Masking (15s)
+### 1:20 Hitting the wall (15s)
 
-| Pane | Do |
-|---|---|
-| Maya | Click **Research**, Enter. Pick the answer that says **4 years, § 337**. |
-| Dashboard | Press `2`, and point at `[CLIENT_1]` and the Key. Press `1` to go back. |
+| Pane | Do | You should see |
+|---|---|---|
+| Daniel | Type `Summarize the Harlow deposition.` | `No document called that in your matters.` |
 
-**Say:** "The client name never left. The key stays here, and we swap it back on device."
+**Say:** "That's Maya's client. Daniel can't even learn the document exists."
 
-### 1:25 Same task, different home (35s)
+### 1:35 Same task, different home (35s)
 
 | Pane | Do |
 |---|---|
@@ -125,35 +135,23 @@ The letters are shuffled, so read the dates.
 
 **Say:** "Same task name. Maya reads a date printed on a docket. Daniel has to count four months from letters, and the small model can't do that reliably. Nobody wrote that rule. The evidence did."
 
-### 2:00 The rest of the firm's day (5s)
+### 2:10 Human in the loop (15s)
 Press `f` on the dashboard. The boards fill for about 60 seconds while you keep going.
 
-### 2:05 The router refuses (15s)
-Paste this into Maya's box:
-
-```
-What is the deadline to remove a case to federal court? Here is the email from our client: 'Maya, please keep this between us. We deleted the alarm log after Brightline called, and I am worried about it.'
-```
-
-**You should see:** `KEPT ON DEVICE · privileged 0.90`
-
-**Say:** "A research question with a privileged email pasted in. It refuses to send it."
-
-Type `Should we accept Brightline's offer?`
+Type this in Maya's box: `Should we accept Brightline's offer?`
 
 **You should see:** `HUMAN · Added to Ruth Abernathy's queue.`
 
-**Say:** "A legal decision. No AI answers it."
+**Say:** "A legal decision. No AI answers it. It goes to a person."
 
-### 2:20 Prove it (25s)
+### 2:25 Close (35s)
 Press `3` for the audit log. Point at `Privileged text sent to cloud 0`, `Log intact`, and Daniel's blocked attempt.
 
 Bring Terminal 3 forward.
 
 **Say:** "This is every word that left the building. Client names are tags."
 
-### 2:45 Close (15s)
-Press `1` for the Board, now filled.
+Press `1` for the Board, still filling in.
 
 **Say:** "Liquid's d1 decides, LFM3 does the work, and privileged text never leaves. The same device fits a clinic, an accounting firm or HR. Don't decide what runs locally. Let the local model prove it."
 
