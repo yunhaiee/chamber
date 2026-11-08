@@ -273,9 +273,9 @@ def _letter(rng, i):
 
 
 RESEARCH_MAYA = [
-    (("What is the California statute of limitations for breach of a written contract?",
-      "How long does a party have in California to sue for breach of a written contract?",
-      "For Harlow Orchards' claim, what is the California time limit for breach of a written contract?"),
+    (("For Harlow Orchards' claim, what is the California time limit for breach of a written contract?",
+      "What is the California statute of limitations for breach of a written contract?",
+      "How long does a party have in California to sue for breach of a written contract?"),
      {"type": "citation", "number": 4, "unit": "year", "number_label": "4 years", "section": "337"}),
     (("What is the California statute of limitations for breach of an oral contract?",
       "For Sunvale Foods' dispute, what is the California limit for breach of an oral contract?"),
