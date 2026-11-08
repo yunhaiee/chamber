@@ -6,9 +6,9 @@
 <script>
 const root = document.getElementById('root');
 const TABS = [['board', 'Board'], ['requests', 'Requests'], ['queue', 'Human queue'], ['audit', 'Audit log'], ['masking', 'Masking']];
-const COLUMNS = [['box', 'On device'], ['claude', 'Cloud'], ['lawyer', 'Human']];
 const DEST_WORD = { box: 'On device', claude: 'Cloud', lawyer: 'Human', blocked: 'Blocked' };
-const ui = { tab: 'board', selected: null, pinned: false, person: '', auditUser: '', auditDest: '', payload: null, seenMask: null, last: {} };
+const TYPE_CLASS = { Testing: 'testing', 'On device': 'box', Cloud: 'claude', Human: 'lawyer' };
+const ui = { tab: 'board', expanded: new Set(), types: null, selected: null, pinned: false, person: '', auditUser: '', auditDest: '', payload: null, seenMask: null, last: {} };
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function shell() {
@@ -22,36 +22,42 @@ function renderTabs() {
 }
 function go(tab) { ui.tab = tab; ui.last = {}; renderTabs(); document.getElementById('main').innerHTML = ''; tick(); }
 
-function dots(row) {
-  const proven = row.base === 'PROVEN';
-  const slots = Math.min(12, Math.max(row.needed, row.dots.length));
-  let out = '';
-  row.dots.forEach(d => {
-    if (d.divider) out += '<span class="divider"></span>';
-    out += `<span class="dot ${d.ok ? 'pass' + (proven ? ' proven' : '') : 'miss'}"></span>`;
-  });
-  for (let i = row.dots.length; i < slots; i++) out += '<span class="dot"></span>';
-  return `<span class="dots">${out}</span>`;
+function strikes(score, needed) {
+  const marks = (score ? score.marks : []).map(ok => `<span class="dot ${ok ? 'pass' : 'miss'}"></span>`);
+  for (let i = marks.length; i < needed; i++) marks.push('<span class="dot"></span>');
+  return `<span class="dots">${marks.join('')}</span>`;
+}
+
+function scoreText(score) { return score && score.total ? `${score.right} of ${score.total} right` : 'not tested yet'; }
+
+function expandedHtml(r) {
+  if (r.type === 'Human') return 'No model answers this. A human decides.';
+  const cloud = r.cloud ? `Cloud ${scoreText(r.cloud)}` : 'Cloud never sent';
+  return `On device ${scoreText(r.local)} &nbsp;·&nbsp; ${cloud} &nbsp;·&nbsp; ${esc(r.model)}`;
 }
 
 function renderBoard(data) {
   const main = document.getElementById('main');
-  const before = new Map();
-  main.querySelectorAll('[data-row]').forEach(el => before.set(el.dataset.row, { rect: el.getBoundingClientRect(), col: el.dataset.col }));
-  main.innerHTML = data.people.map(p => {
-    const counts = COLUMNS.map(([c, n]) => `${n} ${p.rows.filter(r => r.column === c).length}`).join(' · ');
-    return `<section class="band"><div class="eyebrow">${esc(p.name)} &nbsp; ${counts}</div><div class="cols">
-      ${COLUMNS.map(([c, n]) => `<div><div class="dest ${c}">${n}</div>
-        ${p.rows.filter(r => r.column === c).map(r => `<div class="row" data-row="${p.user}/${r.kind}" data-col="${c}">
-          <span class="name">${esc(r.label)}</span><span class="meta">${dots(r)}<span class="state ${c}">${esc(r.state)}</span></span></div>`).join('')}
-      </div>`).join('')}</div></section>`;
-  }).join('');
-  if (reduced) return;
-  main.querySelectorAll('[data-row]').forEach(el => {
-    const was = before.get(el.dataset.row);
-    if (!was || was.col === el.dataset.col) return;
-    const now = el.getBoundingClientRect();
-    el.animate([{ transform: `translate(${was.rect.left - now.left}px, ${was.rect.top - now.top}px)` }, { transform: 'none' }], { duration: 650, easing: 'ease-in-out' });
+  const known = ui.types;
+  ui.types = new Map();
+  main.innerHTML = data.people.map(p => `<section class="band"><div class="eyebrow">${esc(p.name)}</div>
+    <table class="board"><tr class="eyebrow"><th>Task</th><th>Type</th></tr>
+    ${p.rows.map(r => {
+      const id = `${p.user}/${r.kind}`;
+      ui.types.set(id, r.type);
+      const open = ui.expanded.has(id);
+      const fresh = known && known.has(id) && known.get(id) !== r.type;
+      const typeCell = r.type === 'Testing'
+        ? `<span class="state testing">Testing</span><span class="strike">On device ${strikes(r.local, r.needed)}</span><span class="strike">Cloud ${strikes(r.cloud, r.needed)}</span>`
+        : `<span class="state ${TYPE_CLASS[r.type]}">${r.type}</span>`;
+      return `<tr class="pick ${fresh ? 'flash' : ''}" data-row="${id}"><td>${open ? '▾' : '▸'} ${esc(r.label)}</td><td>${typeCell}</td></tr>
+        ${open ? `<tr><td colspan="2" class="muted">${expandedHtml(r)}</td></tr>` : ''}`;
+    }).join('')}</table></section>`).join('');
+  main.querySelectorAll('[data-row]').forEach(el => el.onclick = () => {
+    const id = el.dataset.row;
+    ui.expanded.has(id) ? ui.expanded.delete(id) : ui.expanded.add(id);
+    ui.last.board = null;
+    tick();
   });
 }
 

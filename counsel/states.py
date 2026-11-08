@@ -8,7 +8,7 @@ REQUIRED = {"low": TRIALS, "medium": TRIALS}
 _lock = threading.Lock()
 
 COLUMN = {"LOCAL": "box", "PROVEN": "box", "SHADOW": "claude", "CLAUDE": "claude", "LAWYER": "lawyer"}
-DISPLAY = {"LOCAL": "ON DEVICE", "CLAUDE": "CLOUD", "LAWYER": "HUMAN"}
+TYPE = {"LOCAL": "On device", "PROVEN": "On device", "SHADOW": "Testing", "CLAUDE": "Cloud", "LAWYER": "Human"}
 
 
 def model():
@@ -57,10 +57,7 @@ def streak(user, kind):
 
 
 def word(user, kind, state=None):
-    state = state or current(user, kind)
-    if state == "SHADOW":
-        return f"SHADOW {min(streak(user, kind), required(kind))}/{required(kind)}"
-    return DISPLAY.get(state, state)
+    return TYPE[state or current(user, kind)]
 
 
 def origin(user, kind):
@@ -102,12 +99,23 @@ def record(user, kind, passed, request_id):
             fails = sum(1 for r in recent if not r["passed"])
             if fails >= 2:
                 db.run("UPDATE evidence SET cleared=1 WHERE user=? AND kind=? AND model=?", user, kind, model())
+                db.run("UPDATE cloud_evidence SET cleared=1 WHERE user=? AND kind=? AND model=?", user, kind, model())
                 _move(user, kind, state, "SHADOW", "lost", f"{label} for {matter} lost proven status. The on-device model failed {fails} of its last {len(recent)} checks.")
             return
 
         if state == "SHADOW" and len(live) >= TRIALS:
             passes = sum(1 for r in live if r["passed"])
             _move(user, kind, state, "CLAUDE", "failed out", f"{label} for {matter} goes to the cloud. The on-device model passed {passes} of {len(live)} trials.")
+
+
+def record_cloud(user, kind, passed, request_id):
+    """How the cloud did on the same work, kept against the on-device model it was tested beside."""
+    db.run("INSERT INTO cloud_evidence (user, kind, model, passed, request_id, ts) VALUES (?,?,?,?,?,?)",
+           user, kind, model(), int(passed), request_id, db.now())
+
+
+def _score(rows):
+    return {"right": sum(1 for r in rows if r["passed"]), "total": len(rows), "marks": [bool(r["passed"]) for r in rows][-12:]}
 
 
 def rows_for(user):
@@ -117,14 +125,18 @@ def rows_for(user):
     for row in seen:
         kind = row["kind"]
         state = current(user, kind)
-        all_rows = db.all("SELECT passed, cleared FROM evidence WHERE user=? AND kind=? AND model=? ORDER BY id", user, kind, model())[-12:]
-        dots = []
-        for i, e in enumerate(all_rows):
-            divider = i > 0 and all_rows[i - 1]["cleared"] and not e["cleared"]
-            dots.append({"ok": bool(e["passed"]), "divider": divider})
+        cloud = None
+        if state == "LAWYER":
+            local = None
+        elif state == "LOCAL":
+            # Privileged work has no trials. Show how it did on requests with a known answer.
+            graded = db.all("SELECT box_ok AS passed FROM requests WHERE user=? AND kind=? AND box_ok IS NOT NULL ORDER BY id", user, kind)
+            local = _score(graded)
+        else:
+            local = _score(_live(user, kind))
+            cloud = _score(db.all("SELECT passed FROM cloud_evidence WHERE user=? AND kind=? AND model=? AND cleared=0 ORDER BY id", user, kind, model()))
         out.append({
-            "kind": kind, "label": prepared.label_for(user, kind), "state": word(user, kind, state),
-            "base": state, "column": COLUMN[state], "progress": streak(user, kind),
-            "needed": 0 if state in ("LOCAL", "LAWYER") else required(kind), "dots": dots,
+            "kind": kind, "label": prepared.label_for(user, kind), "type": TYPE[state], "state": state,
+            "local": local, "cloud": cloud, "needed": TRIALS, "model": model(),
         })
     return out

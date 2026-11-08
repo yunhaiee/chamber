@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS requests (
 CREATE TABLE IF NOT EXISTS evidence (
   id INTEGER PRIMARY KEY, user TEXT, kind TEXT, model TEXT, passed INTEGER, request_id INTEGER,
   cleared INTEGER DEFAULT 0, ts REAL);
+CREATE TABLE IF NOT EXISTS cloud_evidence (
+  id INTEGER PRIMARY KEY, user TEXT, kind TEXT, model TEXT, passed INTEGER, request_id INTEGER,
+  cleared INTEGER DEFAULT 0, ts REAL);
 CREATE TABLE IF NOT EXISTS row_events (
   id INTEGER PRIMARY KEY, user TEXT, kind TEXT, model TEXT, from_state TEXT, to_state TEXT, reason TEXT, ts REAL);
 CREATE TABLE IF NOT EXISTS queue (id INTEGER PRIMARY KEY, request_id INTEGER, assignee TEXT, reason TEXT, ts REAL);

@@ -75,6 +75,11 @@ main { padding: 16px 20px 40px; }
 .dot.miss { border-color: var(--fail); }
 .divider { width: 1px; height: 12px; background: var(--muted); margin: 0 2px; }
 .state { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.state.testing { color: var(--ink); font-weight: 600; }
+.strike { margin-left: 18px; font-size: 13px; color: var(--muted); }
+.strike .dots { margin-left: 4px; vertical-align: -1px; }
+table.board { margin-top: 6px; }
+table.board td:first-child, table.board th:first-child { width: 42%; }
 .state.box { color: var(--box); } .state.claude { color: var(--cloud); } .state.lawyer { color: var(--lawyer); }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th { text-align: left; font-weight: 400; }

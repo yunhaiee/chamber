@@ -112,7 +112,7 @@ def find_people(text, priority=localq.CHAT):
     return [n for n in names if isinstance(n, str) and n in text]
 
 
-def _send_cloud(rid, user_row, kind, text, state_word, source):
+def _send_cloud(rid, user_row, kind, text, state_word, source, prep=None):
     """Run the cloud half of a request. Returns the reply fields."""
     try:
         priority = localq.DAY if source == "day" else localq.CHAT
@@ -144,6 +144,8 @@ def _send_cloud(rid, user_row, kind, text, state_word, source):
     )
     _record_actions(rid, result["parsed"], executed=True)
     audit.append(user_row["id"], "request", "claude", sentence, payload_id)
+    if source != "chat" and prep and prep["check"]:
+        states.record_cloud(user_row["id"], kind, checks.run(prep["check"], {"answer": result["cloud_out"]})["ok"], rid)
 
 
 def _finish_box(rid, user_row, kind, parsed, ms, sentence, refused=False, privileged=None):
@@ -312,8 +314,16 @@ def handle(user_row, text, doc_ids=(), source="chat"):
     if not net.online():
         _update(rid, destination="claude", status="waiting", label="Waiting for connection", reply=None)
         return view(rid)
-    _send_cloud(rid, user_row, kind, text, state, source)
+    _send_cloud(rid, user_row, kind, text, state, source, prep)
     return view(rid)
+
+
+def _salvage(raw):
+    """A reply that broke its JSON is still an answer the person can judge."""
+    match = re.search(r'"answer"\s*:\s*"(.*)', raw or "", re.S)
+    text = match.group(1) if match else (raw or "")
+    text = re.split(r'"\s*[,}]', text, maxsplit=1)[0]
+    return text.replace("\\n", "\n").replace('\\"', '"').strip()[:1200]
 
 
 def _offer_choice(rid, user_id, kind, box_result):
@@ -322,10 +332,11 @@ def _offer_choice(rid, user_id, kind, box_result):
     if row["status"] != "done" or box_result is None:
         return  # the cloud half failed or the box is down: nothing to compare
     parsed = box_result[0]
-    if not (isinstance(parsed, dict) and "answer" in parsed):
-        states.record(user_id, kind, False, rid)  # the box produced nothing usable: Claude's answer stands
+    local = render(parsed["answer"]) if isinstance(parsed, dict) and "answer" in parsed else _salvage(row["box_out"])
+    if not local.strip():
+        states.record(user_id, kind, False, rid)  # nothing to compare: the cloud answer stands
         return
-    local, cloud_text = render(parsed["answer"]), row["cloud_out"]
+    cloud_text = row["cloud_out"]
     a_is = random.choice(["local", "cloud"])
     a, b = (local, cloud_text) if a_is == "local" else (cloud_text, local)
     _update(rid, status="choose", options=json.dumps({"a": a, "b": b, "a_is": a_is, "local": local, "cloud": cloud_text}), reply=None, shown=None, label="Which answer is better?")
@@ -338,9 +349,9 @@ def _settled_label(side, row, progress):
 
 
 def _progress(user_id, kind):
-    """SHADOW 2/3 as of this answer, even when the row has just moved."""
+    """TESTING 2/3 as of this answer, even when the row has just moved."""
     state = states.current(user_id, kind)
-    return f"SHADOW {states.TRIALS if state == 'PROVEN' else states.streak(user_id, kind)}/{states.TRIALS}"
+    return f"TESTING {states.TRIALS if state == 'PROVEN' else states.streak(user_id, kind)}/{states.TRIALS}"
 
 
 def record_pick(user_row, rid, choice):
@@ -354,12 +365,14 @@ def record_pick(user_row, rid, choice):
     kind, user_id = row["kind"], user_row["id"]
     if choice == "neither":
         states.record(user_id, kind, False, rid)
+        states.record_cloud(user_id, kind, False, rid)
         _update(rid, options=None)
         _queue_for_lawyer(rid, user_row, kind, row["text"], None, "neither answer was right")
         return view(rid)
     side = "local" if choice == "both" else (options["a_is"] if choice == "a" else ("cloud" if options["a_is"] == "local" else "local"))
     passed = choice == "both" or side == "local"
     states.record(user_id, kind, passed, rid)
+    states.record_cloud(user_id, kind, choice == "both" or side == "cloud", rid)
     reply = options["local"] if side == "local" else options["cloud"]
     _update(rid, status="done", reply=reply, shown="reviewed", destination="box" if side == "local" else "claude", options=None,
             label=_settled_label(side, row, _progress(user_id, kind)))

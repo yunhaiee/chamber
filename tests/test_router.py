@@ -108,7 +108,7 @@ def test_picking_local_ticks_and_picking_claude_misses(stub):
     sent = research_pick(stub)
     local_letter = "a" if sent["options"]["a"] == "the box says 4 years" else "b"
     result = router.record_pick(person("maya"), sent["id"], local_letter)
-    assert result["label"].startswith("ON DEVICE · SHADOW 1/3")
+    assert result["label"].startswith("ON DEVICE · TESTING 1/3")
     assert db.one("SELECT passed FROM evidence ORDER BY id DESC")["passed"] == 1
     sent = research_pick(stub)
     claude_letter = "b" if sent["options"]["a"] == "the box says 4 years" else "a"
@@ -137,12 +137,41 @@ def test_one_person_cannot_answer_anothers_pick(stub):
     assert router.record_pick(person("daniel"), sent["id"], "a") is None
 
 
-def test_parse_failure_on_public_work_is_a_miss_and_cloud_answer_stands(stub):
+def test_broken_json_still_shows_both_answers(stub):
     req = next(r for r in prepared.for_user("maya", "public_research") if "Harlow" in r["text"])
-    stub.answer = "not json at all"
+    stub.answer = '{"answer": "2 years, see section 12 and then it rambles'
     result = send_prepared(req)
-    assert result["ask"] is None and result["status"] == "done" and result["destination"] == "claude"
+    assert result["ask"] == "choose"
+    assert any(t.startswith("2 years, see section 12") for t in result["options"].values())
+
+
+def test_empty_reply_is_a_miss_and_cloud_answer_stands(stub):
+    req = next(r for r in prepared.for_user("maya", "public_research") if "Harlow" in r["text"])
+    stub.answer = ""
+    result = send_prepared(req)
+    assert result["ask"] is None and result["destination"] == "claude"
     assert db.one("SELECT passed FROM evidence")["passed"] == 0
+
+
+def test_board_counts_both_models_while_testing(stub):
+    sent = research_pick(stub)
+    router.record_pick(person("maya"), sent["id"], "both")
+    sent = research_pick(stub)
+    local_letter = "a" if sent["options"]["a"] == "the box says 4 years" else "b"
+    router.record_pick(person("maya"), sent["id"], local_letter)
+    row = next(r for r in states.rows_for("maya") if r["kind"] == "public_research")
+    assert row["type"] == "Testing"
+    assert (row["local"]["right"], row["local"]["total"]) == (2, 2)
+    assert (row["cloud"]["right"], row["cloud"]["total"]) == (1, 2)
+
+
+def test_board_only_uses_the_four_types(stub):
+    req = prepared.for_user("maya", "summarize_deposition")[0]
+    stub.answer = passing_answer(req)
+    send_prepared(req)
+    stub.judg, stub.kind = 0.91, "advice"
+    router.handle(person("maya"), "Should we accept Brightline's offer?")
+    assert {r["type"] for r in states.rows_for("maya")} == {"On device", "Human"}
 
 
 def test_public_research_reaches_cloud_masked_and_restored(stub):
