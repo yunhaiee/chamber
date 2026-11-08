@@ -20,7 +20,7 @@ function destClass(label) {
 
 function shell() {
   root.innerHTML = `<div class="chat">
-    <header><div>${esc(state.me.name)} · ${esc(state.me.matters.map(m => m.name).join(', '))}</div><div class="headright"><select id="model" title="On-device model"></select><span id="online" class="muted"></span></div></header>
+    <header><div>${esc(state.me.name)} · ${esc(state.me.matters.map(m => m.name).join(', '))}</div><div class="headright"><div class="modelmenu" id="modelmenu"><button type="button" id="modelbtn" aria-haspopup="listbox"></button><div class="modellist" id="modellist" role="listbox" hidden></div></div><span id="online" class="muted"></span></div></header>
     <div class="log" id="log"></div>
     <div class="attached" id="attached"></div>
     <div class="tools"><select id="docs"><option value="">Documents ▾</option></select><span id="try"></span></div>
@@ -35,7 +35,24 @@ function shell() {
   text.onkeydown = ev => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); send(); } };
   text.oninput = () => { if (state.tried && text.value !== state.tried.text) state.tried = null; };
   document.getElementById('send').onclick = send;
-  document.getElementById('model').onchange = ev => post('/api/model', { model: ev.target.value });
+  document.getElementById('modelbtn').onclick = () => { const l = document.getElementById('modellist'); l.hidden = !l.hidden; };
+  document.addEventListener('click', ev => { if (!ev.target.closest('#modelmenu')) document.getElementById('modellist').hidden = true; });
+}
+
+function renderModelMenu() {
+  document.getElementById('modelbtn').textContent = `Liquid · ${state.model} ▾`;
+  const list = document.getElementById('modellist');
+  const html = state.models.map(m => `<button type="button" role="option" data-model="${esc(m)}" class="${m === state.model ? 'on' : ''}">Liquid · ${esc(m)}</button>`).join('');
+  if (list.dataset.html === html) return;
+  list.innerHTML = html;
+  list.dataset.html = html;
+  list.querySelectorAll('[data-model]').forEach(b => b.onclick = async () => {
+    list.hidden = true;
+    state.choosing = b.dataset.model;
+    state.model = b.dataset.model;
+    renderModelMenu();
+    await post('/api/model', { model: b.dataset.model });
+  });
 }
 
 function showAttached() {
@@ -117,12 +134,9 @@ function render() {
 async function poll() {
   try {
     const data = await api('/api/chat');
-    const sel = document.getElementById('model');
-    if (document.activeElement !== sel) {
-      const opts = data.models.map(m => `<option value="${esc(m)}">Liquid · ${esc(m)}</option>`).join('');
-      if (sel.dataset.opts !== opts) { sel.innerHTML = opts; sel.dataset.opts = opts; }
-      sel.value = data.model;
-    }
+    state.models = data.models; state.model = state.choosing || data.model;
+    if (state.choosing === data.model) state.choosing = null;
+    renderModelMenu();
     document.getElementById('online').textContent = (data.online ? 'Online' : 'Offline') + (data.standin ? ` · Cloud: ${data.cloud}` : '');
     const snapshot = JSON.stringify(data.messages);
     if (snapshot !== state.last) { state.last = snapshot; messages = data.messages; render(); }
