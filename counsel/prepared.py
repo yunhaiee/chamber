@@ -1,4 +1,4 @@
-"""Prepared requests: 12 per kind, generated from a seeded generator, plus 7 twist emails.
+"""Prepared requests: 12 per kind, generated from a seeded generator.
 
 Every check is written from the values used to generate the document, never from
 a model's output. A prepared request is recognized by exact text plus its document.
@@ -441,31 +441,6 @@ def _client_letter(rng, i):
     return f"Preliminary distribution notes {i + 1}", body, request, check
 
 
-TWIST_DAYS = [
-    (90, "ninety"), (60, "sixty"), (45, "forty-five"), (30, "thirty"), (120, "one hundred twenty"),
-    (75, "seventy-five"), (105, "one hundred five"), (40, "forty"), (100, "one hundred"), (50, "fifty"),
-]
-
-
-def twist_case(i):
-    """A new client who describes dates instead of stating them."""
-    signed = date(2026, 3, 3) + timedelta(days=9 * i)
-    signed_text = f"{signed.day} {signed.strftime('%B')} {signed.year}"
-    closing = date(2026, 6, 12) + timedelta(days=7 * i)
-    days, word = TWIST_DAYS[i]
-    closing_text = f"{closing.day} {closing.strftime('%B')} {closing.year}"
-    due = closing - timedelta(days=days)
-    statement = f"We signed the lease on {signed_text}. The deposit is due {word} days before the closing on {closing_text}."
-    body = (
-        f"PRIVILEGED & CONFIDENTIAL · ATTORNEY-CLIENT COMMUNICATION\n"
-        f"From: Rosa Imani, Corbel Robotics\nTo: Maya Chen\nSubject: dates for the file\n\n"
-        f"Hi Maya, thanks for taking us on. {statement} "
-        f"Please keep this between us for now.\n\nThanks,\nRosa\n"
-    )
-    check = {"type": "dates", "dates": {"signed_date": signed.isoformat(), "due_date": due.isoformat()}}
-    return f"Corbel Robotics email {i + 1}", body, check
-
-
 def build():
     """Return {"docs": [...], "requests": [...]}. Deterministic: seeded at 7."""
     rng = random.Random(7)
@@ -476,7 +451,7 @@ def build():
             docs.append({"matter": matter, "title": title, "body": body, "privileged": privileged, "listed": listed})
         requests.append({
             "id": f"{user}-{kind}-{sum(1 for r in requests if r['user'] == user and r['kind'] == kind and r['source'] == source):02d}"
-                  + ("-twist" if source == "twist" else ""),
+                  ,
             "user": user, "kind": kind, "text": text, "doc_title": title, "check": check,
             "source": source, "doc_len": len(body) if body else None,
         })
@@ -527,10 +502,6 @@ def build():
     for text in ADVICE["daniel"]:
         add("daniel", "advice", text, None, None, None, "rourke")
 
-    for i in range(7):
-        title, body, check = twist_case(i)
-        add("maya", "extract_dates", DATES_REQUEST, title, body, check, "harlow", listed=False, source="twist")
-
     return {"docs": docs, "requests": requests}
 
 
@@ -554,6 +525,3 @@ def for_user(user, kind, source="prepared"):
 def match(text, doc_title):
     return catalog()["by_key"].get(key(text, doc_title))
 
-
-def twist_requests():
-    return [r for r in catalog()["requests"] if r["source"] == "twist"]

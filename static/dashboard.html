@@ -40,7 +40,7 @@ function renderBoard(data) {
   const main = document.getElementById('main');
   const known = ui.types;
   ui.types = new Map();
-  main.innerHTML = data.people.map(p => `<section class="band"><div class="eyebrow">${esc(p.name)}</div>
+  main.innerHTML = data.people.map(p => `<section class="band"><div class="eyebrow">${esc(p.name)} &nbsp; ${esc(p.model)}</div>
     <table class="board"><tr class="eyebrow"><th>Task</th><th>Type</th></tr>
     ${p.rows.map(r => {
       const id = `${p.user}/${r.kind}`;
@@ -90,9 +90,9 @@ function renderRequests(data) {
     document.getElementById('person').onchange = ev => { ui.person = ev.target.value; ui.last = {}; tick(); };
   }
   document.getElementById('person').value = ui.person;
-  document.getElementById('reqs').innerHTML = `<table><tr class="eyebrow"><th>Task</th><th>Person</th><th>Destination</th><th>Time</th><th>Result</th><th>Masked</th><th>d1</th><th></th></tr>
+  document.getElementById('reqs').innerHTML = `<table><tr class="eyebrow"><th>Task</th><th>Person</th><th>Destination</th><th>Time</th><th>On-device check</th><th>Masked</th><th>d1</th><th></th></tr>
     ${data.requests.slice(0, 40).map(r => `<tr class="pick ${r.id === ui.selected ? 'chosen' : ''}" data-id="${r.id}"><td>${esc(r.label)}</td><td>${esc(r.name)}</td><td>${destHtml(r.destination)}</td><td>${clock(r.ts)}</td>
-      <td class="${r.result.startsWith('failed') || r.result === 'blocked' ? 'fail' : ''}">${esc(r.result)}</td><td>${r.tags || ''}</td><td class="muted">${r.priv != null ? `priv ${r.priv.toFixed(2)} · judg ${r.judg.toFixed(2)}` : ''}</td><td class="muted">${r.auto ? 'auto' : ''}</td></tr>`).join('')}</table>`;
+      <td class="${r.result === 'blocked' ? 'fail' : ''}">${esc(r.result)}</td><td>${r.tags || ''}</td><td class="muted">${r.priv != null ? `priv ${r.priv.toFixed(2)} · judg ${r.judg.toFixed(2)}` : ''}</td><td class="muted">${r.auto ? 'auto' : ''}</td></tr>`).join('')}</table>`;
   document.querySelectorAll('tr.pick').forEach(tr => tr.onclick = () => { ui.selected = Number(tr.dataset.id); ui.pinned = true; ui.last.detail = null; tick(); });
   if (!ui.pinned && data.latest_chat && data.latest_chat !== ui.selected && data.latest_chat !== ui.closedAt) ui.selected = data.latest_chat;
 }
@@ -189,7 +189,6 @@ document.addEventListener('keydown', ev => {
   if (ev.key === '3') go('audit');
   if (ev.key === 'm') go('masking');
   if (ev.key === 'f') post('/api/day/start');
-  if (ev.key === 't') post('/api/twist/start');
   if (ev.key === 'Escape') { ui.closedAt = ui.selected; ui.selected = null; ui.pinned = false; ui.last = {}; const d = document.getElementById('detail'); if (d) d.innerHTML = ''; }
 });
 

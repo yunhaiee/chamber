@@ -1,6 +1,7 @@
 """FastAPI app. The person always comes from the session, never from a parameter."""
 import json
 import os
+import re
 import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -131,7 +132,17 @@ def post_chat(body: dict, user=Depends(associate)):
 @app.get("/api/chat")
 def get_chat(user=Depends(associate)):
     rows = db.all("SELECT id FROM requests WHERE user=? AND source='chat' ORDER BY id", user["id"])
-    return {"messages": [router.view(r["id"]) for r in rows], "online": net.online(), "cloud": llm.cloud_label(), "standin": not llm.has_cloud_key()}
+    return {"messages": [router.view(r["id"]) for r in rows], "online": net.online(), "cloud": llm.cloud_label(),
+            "standin": not llm.has_cloud_key(), "models": llm.available_models(), "model": states.model(user["id"])}
+
+
+@app.post("/api/model")
+def choose_model(body: dict, user=Depends(associate)):
+    name = str(body.get("model"))
+    if name not in llm.available_models():
+        raise HTTPException(404, "Not found")
+    states.set_model(user["id"], name)
+    return {"model": name}
 
 
 @app.get("/api/try")
@@ -181,7 +192,7 @@ def board(_user=Depends(partner)):
         "box": {"machine": socket.gethostname(), "models": ["LFM3-1.7B", "d1-2B"]},
         "cloud": {"model": llm.cloud_label(), "standin": not llm.has_cloud_key(), "online": net.online()},
         "people": [
-            {"user": u["id"], "name": u["name"], "rows": states.rows_for(u["id"])}
+            {"user": u["id"], "name": u["name"], "model": states.model(u["id"]), "rows": states.rows_for(u["id"])}
             for u in db.all("SELECT id, name FROM users WHERE role='associate' ORDER BY rowid")
         ],
         "runs": day.status(),
@@ -200,11 +211,12 @@ def _short_result(row):
     if row["label"] and row["label"].startswith("KEPT ON DEVICE"):
         return "refused upstream"
     if row["box_ok"] is None:
-        return "not graded"
+        return "no known answer"
     if row["box_ok"]:
         return "passed"
     reason = json.loads(row["box_checks"] or "{}").get("reason", "")
-    return f"failed: {reason}" if reason else "failed"
+    reason = "bad format" if reason == "no JSON" else re.sub(r"length <= \d+", "too long", reason)
+    return f"missed: {reason}" if reason else "missed"
 
 
 @app.get("/api/requests")
@@ -298,11 +310,6 @@ def masking_rule(body: dict, user=Depends(partner)):
 @app.post("/api/day/start")
 def day_start(_user=Depends(partner)):
     return day.start_day()
-
-
-@app.post("/api/twist/start")
-def twist_start(_user=Depends(partner)):
-    return day.start_twist()
 
 
 def _page(name):

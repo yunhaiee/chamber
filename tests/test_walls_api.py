@@ -55,7 +55,6 @@ def test_prepared_catalog_shape():
     for user, kinds in prepared.KINDS_BY_USER.items():
         for kind in kinds:
             assert len(prepared.for_user(user, kind)) == 12, (user, kind)
-    assert len(prepared.twist_requests()) == 7
     assert len({r["id"] for r in data["requests"]}) == len(data["requests"])
     assert len(data["by_key"]) == len(data["requests"])
 

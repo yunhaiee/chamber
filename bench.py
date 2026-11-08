@@ -75,16 +75,6 @@ def main():
     for repeat in range(2):
         for req in prepared.for_user("maya", "summarize_deposition")[:7]:
             run_one(req, f"depo-repeat-{repeat}", maya, False)
-    for i in range(10):
-        title, body, check = prepared.twist_case(i)
-        req = {"id": f"twist-{i}", "user": "maya", "kind": "extract_dates", "text": prepared.DATES_REQUEST,
-               "doc_title": None, "check": check, "doc_len": len(body), "_body": body, "_title": title}
-        system, user_text = prompts.build("extract_dates", prepared.DATES_REQUEST, [(title, body)])
-        raw, ms = llm.local_chat(system, user_text)
-        result = checks.run(check, llm.first_json(raw))
-        db.run("INSERT INTO bench (run, group_name, user, kind, prepared_id, privileged_truth, box_ok, box_ms, reason, reply, ts) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-               RUN, "twist", "maya", "extract_dates", f"twist-{i}", 1, int(result["ok"]), ms, result["reason"], raw, db.now())
-        print("twist", i, result["ok"], ms, result["reason"])
     report()
 
 
@@ -113,10 +103,9 @@ def report():
     other = sorted(r["d1_judg"] for r in prepared_rows if r["kind"] != "advice")
     kind_right = sum(1 for r in prepared_rows if r["d1_kind"] == r["kind"])
     false_alarms = [r for r in prepared_rows if not r["privileged_truth"] and r["d1_priv"] >= 0.30 and r["kind"] == "public_research"]
-    twist = [r for r in rows if r["group_name"] == "twist"]
     depos = {}
     for r in rows:
-        if r["kind"] == "summarize_deposition" and r["group_name"] != "twist":
+        if r["kind"] == "summarize_deposition":
             idx = int(r["prepared_id"].split("-")[-1])
             if idx < 7:
                 depos.setdefault(idx, []).append(r["box_ok"])
@@ -127,7 +116,6 @@ def report():
         f"d1 chose the right kind: {kind_right} of {len(prepared_rows)}",
         f"Public research false alarms at 0.30: {len(false_alarms)} of {sum(1 for r in prepared_rows if r['kind'] == 'public_research')}",
         f"Depositions 1-7, runs passed: {[sum(v) for _, v in sorted(depos.items())]} of 3 each",
-        f"Twist failed: {sum(1 for r in twist if not r['box_ok'])} of {len(twist)}",
         f"Leak test on bench payloads: {len(leak.scan()['hits'])} hits over {leak.scan()['payloads']} payloads",
     ]
     text = "\n".join(lines)

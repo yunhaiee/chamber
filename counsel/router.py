@@ -72,7 +72,8 @@ def _box(rid, user_id, kind, text, docs, prep, priority, shadow=False, grade=Tru
     """Run the box and grade it if this request has an answer key. Returns (parsed, ms, ok) or None on infra error."""
     system, user_text = prompts.build(kind, text, docs)
     try:
-        raw, ms = localq.run(lambda: llm.local_chat(system, user_text, num_predict=prompts.max_tokens(kind)), priority)
+        model = states.model(user_id)
+        raw, ms = localq.run(lambda: llm.local_chat(system, user_text, model=model, num_predict=prompts.max_tokens(kind)), priority)
     except llm.LocalError as e:
         # A failed shadow must not overwrite the answer Claude gave the person.
         _update(rid, notes=f"box: {e}", **({} if shadow else {"status": "error"}))
@@ -83,7 +84,7 @@ def _box(rid, user_id, kind, text, docs, prep, priority, shadow=False, grade=Tru
         grading = checks.run(prep["check"], parsed, prep["doc_len"])
         ok = grading["ok"]
     _update(
-        rid, box_in=f"{system}\n\n{user_text}", box_out=raw, box_ms=ms,
+        rid, model=model, box_in=f"{system}\n\n{user_text}", box_out=raw, box_ms=ms,
         box_ok=None if ok is None else int(ok), box_checks=json.dumps(grading) if grading else None,
     )
     if ok is not None and grade:
@@ -151,7 +152,7 @@ def _send_cloud(rid, user_row, kind, text, state_word, source, prep=None):
 def _finish_box(rid, user_row, kind, parsed, ms, sentence, refused=False, privileged=None):
     usable = isinstance(parsed, dict) and "answer" in parsed
     reply = render(parsed["answer"]) if usable else "The on-device model couldn't produce an answer in the expected form."
-    label = f"KEPT ON DEVICE · privileged {privileged:.2f}" if refused else f"ON DEVICE · {ms / 1000:.1f}s"
+    label = f"KEPT ON DEVICE · privileged {privileged:.2f}" if refused else f"ON DEVICE · {states.model(user_row['id'])} · {ms / 1000:.1f}s"
     _update(rid, destination="box", status="done", reply=reply, shown="box", label=label)
     _record_actions(rid, parsed, executed=True)
     audit.append(user_row["id"], "request" if not refused else "refused", "blocked" if refused else "box", sentence)
@@ -185,7 +186,7 @@ def handle(user_row, text, doc_ids=(), source="chat"):
     """Route one request. Returns the message view."""
     user_id = user_row["id"]
     priority = localq.DAY if source == "day" else localq.CHAT
-    human = source == "chat"  # the automatic day and the twist have nobody to ask, so they use the answer key
+    human = source == "chat"  # the automatic day has nobody to ask, so it uses the answer key
     rid = db.run(
         "INSERT INTO requests (user, source, text, doc_ids, status, ts) VALUES (?,?,?,?,?,?)",
         user_id, source, text, json.dumps(list(doc_ids)), "working", db.now(),
@@ -344,7 +345,7 @@ def _offer_choice(rid, user_id, kind, box_result):
 
 def _settled_label(side, row, progress):
     if side == "local":
-        return f"ON DEVICE · {progress} · {(row['box_ms'] or 0) / 1000:.1f}s"
+        return f"ON DEVICE · {row['model']} · {progress} · {(row['box_ms'] or 0) / 1000:.1f}s"
     return f"CLOUD · {progress} · {(row['cloud_ms'] or 0) / 1000:.1f}s"
 
 

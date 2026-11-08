@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS requests (
   destination TEXT, state_at_time TEXT, status TEXT, d1 TEXT, hard_rules TEXT,
   box_in TEXT, box_out TEXT, box_ms INTEGER, box_ok INTEGER, box_checks TEXT,
   cloud_in TEXT, cloud_out_tags TEXT, cloud_out TEXT, cloud_ms INTEGER, keymap TEXT,
-  notes TEXT, reply TEXT, label TEXT, shown TEXT, options TEXT, ts REAL);
+  notes TEXT, reply TEXT, label TEXT, shown TEXT, options TEXT, model TEXT, ts REAL);
 CREATE TABLE IF NOT EXISTS evidence (
   id INTEGER PRIMARY KEY, user TEXT, kind TEXT, model TEXT, passed INTEGER, request_id INTEGER,
   cleared INTEGER DEFAULT 0, ts REAL);
@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS cloud_payloads (
   id INTEGER PRIMARY KEY, request_id INTEGER, ts REAL, user TEXT, system TEXT, user_text TEXT, tags TEXT);
 CREATE TABLE IF NOT EXISTS actions (
   id INTEGER PRIMARY KEY, request_id INTEGER, tool TEXT, args TEXT, idempotency_key TEXT, executed INTEGER, ts REAL);
+CREATE TABLE IF NOT EXISTS user_models (user TEXT PRIMARY KEY, model TEXT);
 CREATE TABLE IF NOT EXISTS try_pointer (user TEXT, kind TEXT, idx INTEGER DEFAULT 0, PRIMARY KEY (user, kind));
 """
 

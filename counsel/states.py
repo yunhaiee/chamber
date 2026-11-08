@@ -11,8 +11,14 @@ COLUMN = {"LOCAL": "box", "PROVEN": "box", "SHADOW": "claude", "CLAUDE": "claude
 TYPE = {"LOCAL": "On device", "PROVEN": "On device", "SHADOW": "Testing", "CLAUDE": "Cloud", "LAWYER": "Human"}
 
 
-def model():
-    return llm.LOCAL_MODEL
+def model(user):
+    """The Liquid model this person has chosen. Evidence is kept per model."""
+    row = db.one("SELECT model FROM user_models WHERE user=?", user)
+    return row["model"] if row else llm.LOCAL_MODEL
+
+
+def set_model(user, name):
+    db.run("INSERT INTO user_models (user, model) VALUES (?,?) ON CONFLICT(user) DO UPDATE SET model=?", user, name, name)
 
 
 def _stakes(kind):
@@ -24,7 +30,7 @@ def required(kind):
 
 
 def current(user, kind):
-    row = db.one("SELECT to_state FROM row_events WHERE user=? AND kind=? AND model=? ORDER BY id DESC LIMIT 1", user, kind, model())
+    row = db.one("SELECT to_state FROM row_events WHERE user=? AND kind=? AND model=? ORDER BY id DESC LIMIT 1", user, kind, model(user))
     return row["to_state"] if row else None
 
 
@@ -39,12 +45,12 @@ def ensure(user, kind, path):
         else:
             state = "SHADOW" if path == "public" else "LOCAL"
         db.run("INSERT INTO row_events (user, kind, model, from_state, to_state, reason, ts) VALUES (?,?,?,?,?,?,?)",
-               user, kind, model(), None, state, "first request", db.now())
+               user, kind, model(user), None, state, "first request", db.now())
         return state
 
 
 def _live(user, kind):
-    return db.all("SELECT * FROM evidence WHERE user=? AND kind=? AND model=? AND cleared=0 ORDER BY id", user, kind, model())
+    return db.all("SELECT * FROM evidence WHERE user=? AND kind=? AND model=? AND cleared=0 ORDER BY id", user, kind, model(user))
 
 
 def streak(user, kind):
@@ -61,7 +67,7 @@ def word(user, kind, state=None):
 
 
 def origin(user, kind):
-    row = db.one("SELECT to_state FROM row_events WHERE user=? AND kind=? AND model=? ORDER BY id LIMIT 1", user, kind, model())
+    row = db.one("SELECT to_state FROM row_events WHERE user=? AND kind=? AND model=? ORDER BY id LIMIT 1", user, kind, model(user))
     return row["to_state"] if row else None
 
 
@@ -72,7 +78,7 @@ def _matter_name(user):
 
 def _move(user, kind, from_state, to_state, reason, sentence):
     db.run("INSERT INTO row_events (user, kind, model, from_state, to_state, reason, ts) VALUES (?,?,?,?,?,?,?)",
-           user, kind, model(), from_state, to_state, reason, db.now())
+           user, kind, model(user), from_state, to_state, reason, db.now())
     audit.append(user, "row.move", None, sentence)
 
 
@@ -83,7 +89,7 @@ def record(user, kind, passed, request_id):
         if state not in ("SHADOW", "CLAUDE", "PROVEN"):
             return
         db.run("INSERT INTO evidence (user, kind, model, passed, request_id, ts) VALUES (?,?,?,?,?,?)",
-               user, kind, model(), int(passed), request_id, db.now())
+               user, kind, model(user), int(passed), request_id, db.now())
         live = _live(user, kind)
         label = prepared.label_for(user, kind)
         matter = _matter_name(user)
@@ -98,8 +104,8 @@ def record(user, kind, passed, request_id):
             recent = live[-5:]
             fails = sum(1 for r in recent if not r["passed"])
             if fails >= 2:
-                db.run("UPDATE evidence SET cleared=1 WHERE user=? AND kind=? AND model=?", user, kind, model())
-                db.run("UPDATE cloud_evidence SET cleared=1 WHERE user=? AND kind=? AND model=?", user, kind, model())
+                db.run("UPDATE evidence SET cleared=1 WHERE user=? AND kind=? AND model=?", user, kind, model(user))
+                db.run("UPDATE cloud_evidence SET cleared=1 WHERE user=? AND kind=? AND model=?", user, kind, model(user))
                 _move(user, kind, state, "SHADOW", "lost", f"{label} for {matter} lost proven status. The on-device model failed {fails} of its last {len(recent)} checks.")
             return
 
@@ -111,7 +117,7 @@ def record(user, kind, passed, request_id):
 def record_cloud(user, kind, passed, request_id):
     """How the cloud did on the same work, kept against the on-device model it was tested beside."""
     db.run("INSERT INTO cloud_evidence (user, kind, model, passed, request_id, ts) VALUES (?,?,?,?,?,?)",
-           user, kind, model(), int(passed), request_id, db.now())
+           user, kind, model(user), int(passed), request_id, db.now())
 
 
 def _score(rows):
@@ -121,7 +127,7 @@ def _score(rows):
 def rows_for(user):
     """Board rows for one person, first request first."""
     out = []
-    seen = db.all("SELECT kind, MIN(id) first FROM row_events WHERE user=? AND model=? GROUP BY kind ORDER BY first", user, model())
+    seen = db.all("SELECT kind, MIN(id) first FROM row_events WHERE user=? AND model=? GROUP BY kind ORDER BY first", user, model(user))
     for row in seen:
         kind = row["kind"]
         state = current(user, kind)
@@ -134,9 +140,9 @@ def rows_for(user):
             local = _score(graded)
         else:
             local = _score(_live(user, kind))
-            cloud = _score(db.all("SELECT passed FROM cloud_evidence WHERE user=? AND kind=? AND model=? AND cleared=0 ORDER BY id", user, kind, model()))
+            cloud = _score(db.all("SELECT passed FROM cloud_evidence WHERE user=? AND kind=? AND model=? AND cleared=0 ORDER BY id", user, kind, model(user)))
         out.append({
             "kind": kind, "label": prepared.label_for(user, kind), "type": TYPE[state], "state": state,
-            "local": local, "cloud": cloud, "needed": TRIALS, "model": model(),
+            "local": local, "cloud": cloud, "needed": TRIALS, "model": model(user),
         })
     return out

@@ -74,7 +74,7 @@ def test_privileged_work_is_simply_produced_on_device(stub):
     for req in prepared.for_user("maya", "summarize_deposition")[:4]:
         stub.answer = passing_answer(req)
         sent = send_prepared(req)
-        assert sent["ask"] is None and sent["label"].startswith("ON DEVICE ·")
+        assert sent["ask"] is None and sent["label"].startswith(f"ON DEVICE · {llm.LOCAL_MODEL} ·")
         assert "DRAFT" not in sent["label"]
     assert states.current("maya", "summarize_deposition") == "LOCAL"
     assert db.one("SELECT COUNT(*) n FROM evidence")["n"] == 0
@@ -108,7 +108,7 @@ def test_picking_local_ticks_and_picking_claude_misses(stub):
     sent = research_pick(stub)
     local_letter = "a" if sent["options"]["a"] == "the box says 4 years" else "b"
     result = router.record_pick(person("maya"), sent["id"], local_letter)
-    assert result["label"].startswith("ON DEVICE · TESTING 1/3")
+    assert result["label"].startswith(f"ON DEVICE · {llm.LOCAL_MODEL} · TESTING 1/3")
     assert db.one("SELECT passed FROM evidence ORDER BY id DESC")["passed"] == 1
     sent = research_pick(stub)
     claude_letter = "b" if sent["options"]["a"] == "the box says 4 years" else "a"
@@ -130,6 +130,18 @@ def test_three_trials_not_all_passing_goes_to_claude(stub):
     states.record("maya", "public_research", True, 2)
     states.record("maya", "public_research", False, 3)
     assert states.current("maya", "public_research") == "CLAUDE"
+
+
+def test_each_model_keeps_its_own_record(stub):
+    states.ensure("maya", "public_research", "public")
+    for i in range(3):
+        states.record("maya", "public_research", True, i)
+    assert states.current("maya", "public_research") == "PROVEN"
+    states.set_model("maya", "lfm2.5:8b")
+    assert states.current("maya", "public_research") is None
+    assert states.rows_for("maya") == []
+    states.set_model("maya", llm.LOCAL_MODEL)
+    assert states.current("maya", "public_research") == "PROVEN"
 
 
 def test_one_person_cannot_answer_anothers_pick(stub):

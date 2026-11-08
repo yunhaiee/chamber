@@ -1,4 +1,4 @@
-"""The automatic day and the twist: prepared requests through the same path as the chat."""
+"""The automatic day: prepared requests through the same path as the chat."""
 import threading
 import time
 
@@ -10,11 +10,9 @@ PLAN = {
                ("public_research", 5), ("draft_client_letter", 3), ("advice", 1)],
 }
 DAY_GAP = 1.5
-TWIST_GAP = 1.2
-TWIST_SENT = 5  # 2 misses lose proven, then 3 more fail out
 TOTAL_DAY = sum(n for plan in PLAN.values() for _, n in plan)
 
-_status = {"day": {"running": False, "done": 0, "total": TOTAL_DAY}, "twist": {"running": False, "done": 0, "total": TWIST_SENT}}
+_status = {"day": {"running": False, "done": 0, "total": TOTAL_DAY}}
 _lock = threading.Lock()
 
 
@@ -90,27 +88,11 @@ def start_day():
     return dict(_status["day"])
 
 
-def start_twist():
-    """Once per clean start. The twist has no way to run twice."""
-    with _lock:
-        if _status["twist"]["running"]:
-            return dict(_status["twist"])
-        if db.one("SELECT idx FROM try_pointer WHERE user='_system' AND kind='twist'"):
-            return dict(_status["twist"])
-        db.run("INSERT INTO try_pointer (user, kind, idx) VALUES ('_system','twist',1)")
-        _status["twist"].update(running=True, done=0)
-    maya = db.one("SELECT * FROM users WHERE id='maya'")
-    jobs = [(maya, item) for item in prepared.twist_requests()[:TWIST_SENT]]
-    threading.Thread(target=_run, args=("twist", jobs, TWIST_GAP, "twist"), daemon=True).start()
-    return dict(_status["twist"])
-
-
 def status():
     with _lock:
-        return {"day": dict(_status["day"]), "twist": dict(_status["twist"])}
+        return {"day": dict(_status["day"])}
 
 
 def reset():
     with _lock:
         _status["day"].update(running=False, done=0)
-        _status["twist"].update(running=False, done=0)
