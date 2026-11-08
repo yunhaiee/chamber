@@ -40,6 +40,8 @@ LABELS = {
     "privilege_tag": "Tag for the privilege log",
     "draft_letter": "Draft a meet-and-confer letter",
     "public_research": "Research",
+    "public_deadline": "Public deadline",
+    "public_limit": "Public fee or limit",
     "advice": "Advice or a decision",
     "summarize_instrument": "Summarize a will or trust",
     "extract_beneficiaries": "List beneficiaries and shares",
@@ -56,6 +58,8 @@ PATH = {
     "privilege_tag": ("privileged", "low"),
     "draft_letter": ("privileged", "medium"),
     "public_research": ("public", "medium"),
+    "public_deadline": ("public", "medium"),
+    "public_limit": ("public", "medium"),
     "advice": ("either", "never"),
     "summarize_instrument": ("privileged", "low"),
     "extract_beneficiaries": ("privileged", "low"),
@@ -64,10 +68,10 @@ PATH = {
     "other": ("either", "medium"),
 }
 KINDS_BY_USER = {
-    "maya": ["summarize_deposition", "extract_dates", "privilege_tag", "draft_letter", "public_research", "advice"],
+    "maya": ["summarize_deposition", "extract_dates", "privilege_tag", "draft_letter", "public_deadline", "public_limit", "public_research", "advice"],
     "daniel": [
         "summarize_instrument", "extract_beneficiaries", "compute_distribution",
-        "draft_client_letter", "public_research", "advice",
+        "draft_client_letter", "public_deadline", "public_limit", "public_research", "advice",
     ],
 }
 
@@ -441,6 +445,63 @@ def _client_letter(rng, i):
     return f"Preliminary distribution notes {i + 1}", body, request, check
 
 
+DOCKET_PARTIES = [
+    "Harlow Orchards v. Brightline Freight", "Alder Logistics v. Merced Packing",
+    "Sunvale Foods v. Coastline Cold Storage", "Redwood Haulers v. Tidewell Insurance",
+]
+
+
+def _nice(d):
+    return f"{d.strftime('%B')} {d.day}, {d.year}"
+
+
+def _docket_deadline(rng, i):
+    """Maya's public deadline: printed on the docket, so it only has to be read."""
+    hearing, dept = date(2026, rng.randint(9, 12), rng.randint(1, 27)), rng.randint(301, 620)
+    party = DOCKET_PARTIES[i % len(DOCKET_PARTIES)]
+    text = (
+        "Read this public docket entry. Give the hearing date and the department.\n\n"
+        f"SUPERIOR COURT OF CALIFORNIA, COUNTY OF SAN FRANCISCO. Public docket. {party}, CGC-26-{rng.randint(100000, 999999)}. "
+        f"Notice of motion filed {_nice(hearing - timedelta(days=30))}. Motion to compel set for hearing on {_nice(hearing)} "
+        f"at 9:00 a.m. in Department {dept}. Check the court website for changes."
+    )
+    return text, {"type": "facts", "facts": [{"type": "date", "value": hearing.isoformat()}, {"type": "number", "value": str(dept)}]}
+
+
+def _add_months(d, n):
+    month = d.month - 1 + n
+    return date(d.year + month // 12, month % 12 + 1, min(d.day, 28))
+
+
+def _claim_deadline(rng, i):
+    """Daniel's public deadline: not printed anywhere, so it has to be worked out."""
+    issued = date(2026, rng.randint(9, 12), rng.randint(1, 27))
+    text = (
+        "Under public probate rules, a creditor may file a claim within four months after letters are first issued. "
+        f"Letters were issued on {_nice(issued)}. What is the last day to file? Give it as YYYY-MM-DD."
+    )
+    return text, {"type": "facts", "facts": [{"type": "date", "value": _add_months(issued, 4).isoformat()}]}
+
+
+def _limit_check(value, limit):
+    """Maya's public fee or limit: one comparison against a stated limit."""
+    text = (
+        f"A public rule says limited civil cases cover claims up to {limit:,} dollars. A claim is for {value:,} dollars. "
+        "Is it within the limit? Answer with exactly one of: Within, Over."
+    )
+    return text, {"type": "label", "label": "Within" if value <= limit else "Over", "labels": ["Within", "Over"]}
+
+
+def _statutory_fee(value):
+    """Daniel's public fee or limit: tiered arithmetic on a published schedule."""
+    fee = min(value, 100000) * 0.04 + min(max(value - 100000, 0), 100000) * 0.03 + max(value - 200000, 0) * 0.02
+    text = (
+        "The public statutory fee schedule pays an executor 4 percent of the first 100,000, 3 percent of the next 100,000 "
+        f"and 2 percent of the next 800,000. For an estate of {value:,}, what is the fee in dollars?"
+    )
+    return text, {"type": "facts", "facts": [{"type": "number", "value": str(int(fee))}]}
+
+
 def build():
     """Return {"docs": [...], "requests": [...]}. Deterministic: seeded at 7."""
     rng = random.Random(7)
@@ -501,6 +562,22 @@ def build():
         add("daniel", "public_research", wording + RESEARCH_SUFFIX, None, None, topic[1], "rourke")
     for text in ADVICE["daniel"]:
         add("daniel", "advice", text, None, None, None, "rourke")
+
+    # Public tasks with the same name for both people. The work differs by practice. Own generator, so earlier fixtures don't shift.
+    public = random.Random(23)
+    limits = public.sample(range(1000, 90000, 500), 12)
+    fees = public.sample(range(150000, 950000, 5000), 12)
+    for i in range(12):
+        text, check = _docket_deadline(public, i)
+        add("maya", "public_deadline", text, None, None, check, "harlow")
+        text, check = _limit_check(limits[i], 35000 if i % 2 else 12500)
+        add("maya", "public_limit", text, None, None, check, "harlow")
+        text, check = _claim_deadline(public, i)
+        while any(r["text"] == text for r in requests):
+            text, check = _claim_deadline(public, i)
+        add("daniel", "public_deadline", text, None, None, check, "rourke")
+        text, check = _statutory_fee(fees[i])
+        add("daniel", "public_limit", text, None, None, check, "rourke")
 
     return {"docs": docs, "requests": requests}
 

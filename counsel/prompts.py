@@ -17,6 +17,8 @@ BY_KIND = {
     "draft_client_letter": "The answer is the letter as text. Include every item the request names. Never use anything marked internal.",
     "extract_beneficiaries": 'The answer is text with one line per person, written as "name: percent".',
     "compute_distribution": 'The answer is text with one line per person, written as "name: amount". Do the arithmetic.',
+    "public_deadline": "Be brief. State only what is asked.",
+    "public_limit": "Be brief. State only what is asked.",
     "public_research": "Answer from your knowledge of United States law. State only the time limit and the section, in under 15 words. If unsure, give your best single guess.",
 }
 SUMMARIES = ("summarize_deposition", "summarize_instrument")
@@ -24,7 +26,7 @@ SUMMARIES = ("summarize_deposition", "summarize_instrument")
 
 TOKEN_CAP = {
     "privilege_tag": 40, "extract_dates": 120, "extract_beneficiaries": 200, "compute_distribution": 200,
-    "public_research": 200, "summarize_deposition": 450, "summarize_instrument": 450,
+    "public_research": 200, "public_deadline": 200, "public_limit": 200, "summarize_deposition": 450, "summarize_instrument": 450,
     "draft_letter": 600, "draft_client_letter": 600,
 }
 

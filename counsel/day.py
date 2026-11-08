@@ -5,9 +5,9 @@ import time
 from . import db, prepared, router
 
 PLAN = {
-    "maya": [("extract_dates", 5), ("privilege_tag", 5), ("public_research", 5), ("draft_letter", 3), ("advice", 1)],
-    "daniel": [("summarize_instrument", 5), ("extract_beneficiaries", 5), ("compute_distribution", 5),
-               ("public_research", 5), ("draft_client_letter", 3), ("advice", 1)],
+    "maya": [("extract_dates", 3), ("privilege_tag", 3), ("public_deadline", 3), ("public_limit", 3), ("public_research", 3), ("draft_letter", 2), ("advice", 1)],
+    "daniel": [("summarize_instrument", 3), ("extract_beneficiaries", 3), ("compute_distribution", 3), ("public_deadline", 3), ("public_limit", 3),
+               ("public_research", 3), ("draft_client_letter", 2), ("advice", 1)],
 }
 DAY_GAP = 1.5
 TOTAL_DAY = sum(n for plan in PLAN.values() for _, n in plan)
