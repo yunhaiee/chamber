@@ -88,7 +88,7 @@ def norm_section(value):
 
 def _section_pattern(section):
     body = re.escape(norm_section(section))
-    return re.compile(rf"(?<![\d.]){body}(?![\d])", re.I)
+    return re.compile(rf"(?<!\d){body}(?!\d)", re.I)
 
 
 def has_section(text, section):

@@ -50,3 +50,7 @@ def test_number_date_and_section_normalizers():
         assert checks.has_section(form, "337"), form
     assert checks.has_section("Rule 12(a)(1)(A)(i)", "12(a)")
     assert not checks.has_section("§ 3370", "337")
+
+
+def test_section_after_abbreviation_period():
+    assert checks.has_section("14 days, under Fed. R. Civ. P. 26(a)(1)(C).", "26(a)(1)(C)")
