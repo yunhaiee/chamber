@@ -67,13 +67,14 @@ def _record_actions(rid, parsed, executed):
                rid, tool, json.dumps(action.get("args", {})), f"{rid}-{i}", int(executed and tool in ALLOWED_ACTIONS), db.now())
 
 
-def _box(rid, user_id, kind, text, docs, prep, priority):
+def _box(rid, user_id, kind, text, docs, prep, priority, shadow=False):
     """Run the box and grade it if this request has an answer key. Returns (parsed, ms, ok) or None on infra error."""
     system, user_text = prompts.build(kind, text, docs)
     try:
         raw, ms = localq.run(lambda: llm.local_chat(system, user_text, num_predict=prompts.max_tokens(kind)), priority)
     except llm.LocalError as e:
-        _update(rid, status="error", notes=f"box: {e}")
+        # A failed shadow must not overwrite the answer Claude gave the person.
+        _update(rid, notes=f"box: {e}", **({} if shadow else {"status": "error"}))
         return None
     parsed = llm.first_json(raw)
     ok, grading = None, None
@@ -90,7 +91,7 @@ def _box(rid, user_id, kind, text, docs, prep, priority):
 
 
 def _shadow(rid, user_id, kind, text, docs, prep, priority):
-    result = _box(rid, user_id, kind, text, docs, prep, max(priority, localq.DAY))
+    result = _box(rid, user_id, kind, text, docs, prep, max(priority, localq.DAY), shadow=True)
     if result:
         _record_actions(rid, result[0], executed=False)
 
@@ -150,7 +151,7 @@ def _finish_box(rid, user_row, kind, parsed, ms, state, sentence, refused=False,
         reply = "The box couldn't produce an answer in the expected form."
     if refused:
         label = f"KEPT ON THE BOX · privileged {privileged:.2f}"
-    elif state in ("DRAFT",):
+    elif state != "PROVEN":
         label = f"ON THE BOX · {states.word(user_row['id'], kind, 'DRAFT')} · {ms / 1000:.1f}s"
     else:
         label = f"ON THE BOX · {ms / 1000:.1f}s"

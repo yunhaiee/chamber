@@ -11,7 +11,7 @@ _STOP = set("""
 a an the this that these those my our his her their your me us of for to from by with in on at and or about
 summarize summarise pull get show find open read review send draft tag list fetch give see attach use compute
 please can could would should will do does did is are was were what who when how why which it its
-new last first latest client clients family day
+new last first latest client clients family day here there
 """.split())
 _FETCH_VERB = re.compile(r"^\s*(please\s+)?(summari[sz]e|open|show|get|pull|read|find|fetch|review|tag|list)\b", re.I)
 
@@ -56,7 +56,7 @@ def find_reference(user, text):
         phrase = " ".join(names + [match.group(1)])
         mine, others = [], []
         for doc in db.all("SELECT d.*, m.name AS matter_name, m.parties FROM documents d JOIN matters m ON d.matter_id = m.id ORDER BY d.id"):
-            hay = f"{doc['title']} {doc['matter_name']} {doc['parties']}".lower()
+            hay = set(re.findall(r"[a-z0-9]+", f"{doc['title']} {doc['matter_name']} {doc['parties']}".lower()))
             if all(w in hay for w in wanted):
                 (mine if doc["matter_id"] in matters_of(user) else others).append(doc)
         if mine:

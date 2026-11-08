@@ -88,7 +88,7 @@ function renderRequests(data) {
     ${data.requests.slice(0, 40).map(r => `<tr class="pick ${r.id === ui.selected ? 'chosen' : ''}" data-id="${r.id}"><td>${esc(r.name)}</td><td>${esc(r.label)}</td><td>${destHtml(r.destination)}</td><td>${clock(r.ts)}</td>
       <td class="${r.result.startsWith('failed') || r.result === 'blocked' ? 'fail' : ''}">${esc(r.result)}</td><td>${r.tags || ''}</td><td class="muted">${r.priv != null ? `priv ${r.priv.toFixed(2)} · judg ${r.judg.toFixed(2)}` : ''}</td><td class="muted">${r.auto ? 'auto' : ''}</td></tr>`).join('')}</table>`;
   document.querySelectorAll('tr.pick').forEach(tr => tr.onclick = () => { ui.selected = Number(tr.dataset.id); ui.pinned = true; ui.last.detail = null; tick(); });
-  if (!ui.pinned && data.latest_chat && data.latest_chat !== ui.selected) ui.selected = data.latest_chat;
+  if (!ui.pinned && data.latest_chat && data.latest_chat !== ui.selected && data.latest_chat !== ui.closedAt) ui.selected = data.latest_chat;
 }
 
 function renderQueue(items) {
@@ -170,7 +170,7 @@ document.addEventListener('keydown', ev => {
   if (ev.key === 'm') go('masking');
   if (ev.key === 'f') post('/api/day/start');
   if (ev.key === 't') post('/api/twist/start');
-  if (ev.key === 'Escape') { ui.selected = null; ui.pinned = false; ui.last = {}; const d = document.getElementById('detail'); if (d) d.innerHTML = ''; }
+  if (ev.key === 'Escape') { ui.closedAt = ui.selected; ui.selected = null; ui.pinned = false; ui.last = {}; const d = document.getElementById('detail'); if (d) d.innerHTML = ''; }
 });
 
 signIn(root, 'partner', async () => {
