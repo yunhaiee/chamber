@@ -1,10 +1,21 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Counsel Box</title><link rel="stylesheet" href="/static/style.css"></head>
-<body><div class="panes" id="panes"></div>
+<body><div class="stage">
+  <div class="stage-chat">
+    <div class="switch" role="tablist">
+      <button class="on" data-pane="maya" role="tab">Maya Chen</button>
+      <button data-pane="daniel" role="tab">Daniel Osei</button>
+    </div>
+    <iframe id="maya" title="Maya Chen" src="/chat?pane=left"></iframe>
+    <iframe id="daniel" title="Daniel Osei" src="/chat?pane=right" hidden></iframe>
+  </div>
+  <iframe id="board" title="Firm dashboard" src="/?pane=partner"></iframe>
+</div>
 <script>
-const port = location.port ? ':' + location.port : '';
-document.getElementById('panes').innerHTML =
-  `<iframe title="Maya Chen" src="http://localhost${port}/chat?pane=left"></iframe>` +
-  `<iframe title="Daniel Osei" src="http://127.0.0.1${port}/chat?pane=right"></iframe>`;
+document.querySelectorAll('.switch button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.switch button').forEach(x => x.classList.toggle('on', x === b));
+  document.getElementById('maya').hidden = b.dataset.pane !== 'maya';
+  document.getElementById('daniel').hidden = b.dataset.pane !== 'daniel';
+});
 </script></body></html>

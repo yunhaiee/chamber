@@ -154,11 +154,10 @@ def _send_cloud(rid, user_row, kind, text, state_word, source, prep=None):
 def _finish_box(rid, user_row, kind, parsed, ms, sentence, refused=False, why=None):
     usable = isinstance(parsed, dict) and "answer" in parsed
     reply = render(parsed["answer"]) if usable else "The on-device model couldn't produce an answer in the expected form."
-    model = states.model(user_row["id"])
     if refused:
         label = f"KEPT ON DEVICE · {why}"
     else:
-        label = f"ON DEVICE · {why + ' · ' if why else ''}{model} · {ms / 1000:.1f}s"
+        label = f"ON DEVICE · {why + ' · ' if why else ''}{ms / 1000:.1f}s"
     warning = states.warning_for(user_row["id"], kind, exclude=rid) if why and not refused else None
     _update(rid, destination="box", status="done", reply=reply, shown="box", label=label, warning=warning)
     # Text in a privileged file or pasted email may try to instruct the model, so its planned actions are captured, never run.

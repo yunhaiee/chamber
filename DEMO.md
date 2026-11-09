@@ -32,20 +32,13 @@ SH_DB=demo.db .venv/bin/python wire.py --last 0
 curl -s localhost:11434/api/chat -d '{"model":"lfm3:1.7b","stream":false,"messages":[{"role":"user","content":"hi"}]}' >/dev/null
 ```
 
-**Windows, at 110-125% zoom:**
+**One window, full screen:** open `http://localhost:8000/demo`. The chat is on the left with a **Maya Chen | Daniel Osei** switch, and the dashboard is on the right.
 
-| Where | Open |
-|---|---|
-| Left, 55% | `http://localhost:8000/demo` (Maya on the left, Daniel on the right) |
-| Right, 45% | `http://localhost:8000/` (the dashboard, on Board) |
+**Check:** the board is empty and the chat says Online.
 
-**Check:** both boards are empty, and both chats say Online.
+**To rehearse again:** rerun `./scripts/clean_start.sh 8000` and refresh the page. It wipes everything.
 
-**To rehearse again:** rerun `./scripts/clean_start.sh 8000` and refresh both pages. It wipes everything.
-
-**Keys on the dashboard:** `1` Board · `2` Requests · `3` Audit log · `m` Masking · `f` automatic day · `Esc` close detail
-
-**In chat:** click a task link under the message box, then press Enter.
+**In chat:** on a new chat, click a task in the list. Once a chat has started, open **Tasks** next to `+ Attach file`, pick the task, then press Enter.
 
 ---
 
@@ -64,26 +57,26 @@ So we don't draw the line. Each model has to earn it."
 
 | Pane | Do |
 |---|---|
-| Maya | Click **Public lookup**, Enter. Press **Both good**. Do this 3 times. |
+| Maya | Pick **Public lookup** under Tasks, Enter. Press **Both good**. Do this 3 times. |
 
 Correct answers: December 12, 2026, Dept 330 · September 13, 2026, Dept 386 · September 1, 2026, Dept 372.
 
 **You should see:** on the Board, Maya's **Public lookup** goes from Testing to **On device**.
 
-**Say:** "Liquid's d1 model reads every request on this device and decides where it can go. This one is public, so both models answer, and the lawyer picks without knowing which is which. After three good answers, the cloud stops being called. Each Liquid model earns its own record."
+**Say:** "Liquid's d1 model reads every request on this device and decides where it can go. This one is public, so both models answer, and the lawyer picks without knowing which is which. After three good answers, the cloud stops being called. We set it to three to keep this demo short. Each Liquid model earns its own record."
 
 ### 1:00 Masking (15s)
 
 | Pane | Do |
 |---|---|
-| Maya | Click **Research**, Enter. Pick the answer that says **4 years, § 337**. |
-| Dashboard | Press `2`. Point at `[CLIENT_1]` and the Key. Press `1` to go back. |
+| Maya | Pick **Research** under Tasks, Enter. Pick the answer that says **4 years, § 337**. |
+| Dashboard | Click **Requests**, then the top row. Point at `[CLIENT_1]` and the Key. Click **Board** to go back. |
 
 **Say:** "When work goes to the cloud, the client's name doesn't. The key stays here, and we swap the name back here."
 
 ### 1:15 Privileged work (20s)
 
-**1. A privileged file.** Maya: click **Summarize deposition**. Point at the **Privileged file** tag, then press Enter.
+**1. A privileged file.** Maya: pick **Summarize deposition** under Tasks. Point at the **Privileged file** tag, then press Enter.
 
 **You should see:** `ON DEVICE · privileged file attached`
 
@@ -105,12 +98,12 @@ What is the deadline to remove a case to federal court? Here is the email from o
 
 | Pane | Do | You should see |
 |---|---|---|
-| Daniel | Type `Summarize the Harlow deposition.` | `No document called that in your matters.` |
+| Daniel | Switch to **Daniel Osei** at the top. Type `Summarize the Harlow deposition.` | `No document called that in your matters.` |
 
 **Say:** "Same on-device model, same hardware, and Daniel still can't see Maya's files. He can't even tell the file exists. Today this runs on my Mac. In a firm, it would run on a dedicated AI machine in the office."
 
 ### 1:55 Same task, different result (30s)
-Press `f` on the dashboard, and press `1` if you aren't on the Board.
+On the Board, click **Run the firm's day**.
 
 **Say:** "Let's send a lot of different tasks quickly and see how they split."
 
@@ -124,19 +117,19 @@ Give it about 30 seconds.
 
 | Pane | Do | You should see |
 |---|---|---|
-| Daniel | Click **Distributions**, Enter | `Often wrong on this task` warning under the answer |
+| Daniel | Pick **Distributions** under Tasks, Enter | `Often wrong on this task` warning under the answer |
 
 **Say:** "Privileged work can't go to the cloud, so when the model is weak at it, the lawyer gets told."
 
 ### 2:35 Human in the loop (10s)
-Type this in Maya's box: `Should we accept Brightline's offer?`
+Switch to **Maya Chen**. Type `Should we accept Brightline's offer?`
 
 **You should see:** `HUMAN · Added to Ruth Abernathy's queue.`
 
 **Say:** "d1 recognizes a legal decision. No AI answers it. It goes to a person."
 
 ### 2:45 Close (15s)
-Press `3` for the audit log. Point at `Privileged text sent to cloud 0` and `Log intact`. Press `1` for the Board.
+Click **Audit log**. Point at `Privileged text sent to cloud 0` and `Log intact`. Click **Board**.
 
 **Say:** "Nothing privileged left the building, and the managing partner can read exactly what did.
 
@@ -152,6 +145,7 @@ Don't decide what runs locally. Let the local model prove it."
 |---|---|
 | An answer takes more than 10 seconds | Keep talking. The first call after a pause loads the model. |
 | Both A and B look wrong | Press **Neither**. It goes to the human queue, which is a fine thing to show. |
+| A menu covers the answer | Click anywhere else to close it. |
 | Wi-Fi drops | Say so. On-device work continues, and cloud work shows `Waiting for connection` and runs on reconnect. |
 | Chat shows an error | `curl localhost:9931/health`, then rerun clean start and refresh. |
 | Daniel's rows still say Testing | Wait a few more seconds. His last trials are still finishing. |
@@ -174,6 +168,9 @@ Don't decide what runs locally. Let the local model prove it."
 
 **Why doesn't privileged work earn its way?**
 It can't be compared with the cloud, so there's no second answer. It's produced on device, and a lawyer fixes it if it's wrong.
+
+**How do you know it's wrong if it never went to the cloud?**
+The test requests were generated with the correct amounts, so the on-device answer is compared with a known figure, on device. No cloud answer is involved. A real firm would need its own test set, or corrections from its lawyers, to get the same signal.
 
 **Daniel's "Compute distributions" says 0 of 3 right. Why is it still on device?**
 It's privileged, so it can never leave. The record tells the lawyer to check it. Better math needs a better local model.

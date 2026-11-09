@@ -76,3 +76,4 @@ def test_partner_never_sees_privileged_text(client, monkeypatch):
     detail = client.get(f"/api/requests/{sent['id']}", headers=ruth)
     assert detail.status_code == 200 and detail.json()["hidden"] is True
     assert "Karen Doyle" not in detail.text and "Summarize this" not in detail.text
+    assert "Karen Doyle" not in client.get("/api/requests", headers=ruth).text

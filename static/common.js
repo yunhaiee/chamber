@@ -1,4 +1,5 @@
-const TOKEN_KEY = 'counsel-token';
+// One browser tab can hold several signed-in frames, so each pane keeps its own session.
+const TOKEN_KEY = 'counsel-token-' + (new URLSearchParams(location.search).get('pane') || 'main');
 function token() { try { return sessionStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; } }
 function setToken(t) { try { sessionStorage.setItem(TOKEN_KEY, t); } catch {} }
 function clearToken() { try { sessionStorage.removeItem(TOKEN_KEY); } catch {} }

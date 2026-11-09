@@ -21,7 +21,7 @@ function destClass(label) {
 
 function shell() {
   root.innerHTML = `<div class="chat empty" id="chat">
-    <header><div>${esc(state.me.name)} · ${esc(state.me.matters.map(m => m.name).join(', '))}</div><span id="online" class="muted"></span></header>
+    <header><div class="who">${esc(state.me.matters.map(m => m.name).join(', '))}</div><span id="online" class="muted"></span></header>
     <div class="log" id="log"></div>
     <div class="tools"><div id="try"></div></div>
     <div class="composerwrap"><div class="composer">
@@ -29,6 +29,7 @@ function shell() {
       <textarea id="text" rows="1" placeholder="Ask anything" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false" spellcheck="false"></textarea>
       <div class="composerrow">
         <div class="attachmenu" id="attachmenu"><button type="button" id="attachbtn">+ Attach file</button><div class="attachlist" id="attachlist" hidden></div></div>
+        <div class="taskmenu" id="taskmenu"><button type="button" id="taskbtn">Tasks ▾</button><div class="tasklist" id="tasklist" hidden></div></div>
         <span class="spacer"></span>
         <div class="modelmenu" id="modelmenu"><button type="button" id="modelbtn" aria-haspopup="listbox"></button><div class="modellist" id="modellist" role="listbox" hidden></div></div>
         <button id="send" aria-label="Send">↑</button>
@@ -40,11 +41,13 @@ function shell() {
   text.onkeydown = ev => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); send(); } };
   text.oninput = () => { autosize(); if (state.tried && text.value !== state.tried.text) state.tried = null; };
   document.getElementById('send').onclick = send;
+  document.getElementById('taskbtn').onclick = async () => { const l = document.getElementById('tasklist'); if (l.hidden) await loadTry(); l.hidden = !l.hidden; };
   document.getElementById('modelbtn').onclick = () => { const l = document.getElementById('modellist'); l.hidden = !l.hidden; };
-  window.addEventListener('blur', () => { document.getElementById('modellist').hidden = true; document.getElementById('attachlist').hidden = true; });
+  window.addEventListener('blur', () => { document.getElementById('modellist').hidden = true; document.getElementById('attachlist').hidden = true; document.getElementById('tasklist').hidden = true; });
   document.addEventListener('click', ev => {
     if (!ev.target.closest('#modelmenu')) document.getElementById('modellist').hidden = true;
     if (!ev.target.closest('#attachmenu')) document.getElementById('attachlist').hidden = true;
+    if (!ev.target.closest('#taskmenu')) document.getElementById('tasklist').hidden = true;
   });
 }
 
@@ -55,7 +58,7 @@ function autosize() {
 }
 
 function renderModelMenu() {
-  document.getElementById('modelbtn').textContent = `Liquid · ${state.model} ▾`;
+  document.getElementById('modelbtn').textContent = `${state.model} ▾`;
   const list = document.getElementById('modellist');
   const html = state.models.map(m => `<button type="button" role="option" data-model="${esc(m)}" class="${m === state.model ? 'on' : ''}">Liquid · ${esc(m)}</button>`).join('');
   if (list.dataset.html === html) return;
@@ -81,9 +84,12 @@ function showAttached() {
 
 async function loadTry() {
   state.tryItems = await api('/api/try');
-  document.getElementById('try').innerHTML = state.tryItems.map((t, i) =>
+  const items = state.tryItems.map((t, i) =>
     `<button class="try" data-i="${i}">${esc(SHORT[t.kind] || t.label)}${t.doc_ids.length ? '<span class="filemark">+ file</span>' : ''}</button>`).join('');
+  document.getElementById('try').innerHTML = items;
+  document.getElementById('tasklist').innerHTML = items;
   document.querySelectorAll('.try').forEach(b => b.onclick = () => {
+    document.getElementById('tasklist').hidden = true;
     const t = state.tryItems[Number(b.dataset.i)];
     document.getElementById('text').value = t.text;
     autosize();
@@ -111,7 +117,7 @@ async function send(textOverride) {
 }
 
 function messageHtml(m) {
-  const long = m.text.length > 150;
+  const long = m.text.length > 90;
   const open = state.expanded.has(m.id);
   const cls = destClass(m.label);
   let extra = '';

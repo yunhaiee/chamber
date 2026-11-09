@@ -140,7 +140,7 @@ def warning_for(user, kind, exclude=0):
     """A short warning when this model mostly gets this privileged task wrong."""
     right, total = known_record(user, kind, exclude)
     if total >= 3 and right * 2 < total:
-        return f"Often wrong on this task ({right} of {total} right on known answers). Check it."
+        return f"Often wrong on this task ({right} of {total} right on test cases). Check it."
     return None
 
 

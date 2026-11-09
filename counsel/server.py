@@ -192,6 +192,12 @@ def board(_user=Depends(partner)):
     }
 
 
+def _privileged(row):
+    d1 = json.loads(row["d1"] or "null")
+    flagged = bool(json.loads(row["hard_rules"] or "[]")) or (d1 is not None and d1["privileged"] >= router.PRIVILEGED_AT)
+    return flagged and row["cloud_in"] is None
+
+
 def _short_result(row):
     if row["status"] == "queued":
         return "queued"
@@ -207,6 +213,8 @@ def _short_result(row):
         return "no known answer"
     if row["box_ok"]:
         return "passed"
+    if _privileged(row):
+        return "missed"  # the reason would name people and amounts from the file
     reason = json.loads(row["box_checks"] or "{}").get("reason", "")
     reason = "bad format" if reason == "no JSON" else re.sub(r"length <= \d+", "too long", reason)
     return f"missed: {reason}" if reason else "missed"
@@ -242,12 +250,11 @@ def request_detail(rid: int, _user=Depends(partner)):
     box_ran = r["box_in"] is not None
     cloud_ran = r["cloud_in"] is not None
     d1 = json.loads(r["d1"] or "null")
-    privileged = bool(json.loads(r["hard_rules"] or "[]")) or (d1 is not None and d1["privileged"] >= router.PRIVILEGED_AT)
-    if privileged and not cloud_ran:
+    if _privileged(r):
         # The partner sees that it happened and how it did, never the privileged text itself.
         return {
             "id": r["id"], "kind": r["kind"], "text": None, "destination": r["destination"], "label": r["label"], "hidden": True,
-            "box": {"received": None, "answer": None, "ms": r["box_ms"], "checks": json.loads(r["box_checks"] or "null"), "ok": r["box_ok"]} if box_ran else None,
+            "box": {"received": None, "answer": None, "ms": r["box_ms"], "checks": None, "ok": r["box_ok"]} if box_ran else None,
             "cloud": None, "key": None, "d1": d1, "hard_rules": json.loads(r["hard_rules"] or "[]"), "notes": None, "shown": None,
         }
     return {

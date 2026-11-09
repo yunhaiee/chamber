@@ -75,7 +75,7 @@ def test_privileged_work_is_simply_produced_on_device(stub):
     for req in prepared.for_user("maya", "summarize_deposition")[:4]:
         stub.answer = passing_answer(req)
         sent = send_prepared(req)
-        assert sent["ask"] is None and sent["label"].startswith(f"ON DEVICE · privileged file attached · {llm.LOCAL_MODEL} ·")
+        assert sent["ask"] is None and sent["label"].startswith("ON DEVICE · privileged file attached ·")
         assert "DRAFT" not in sent["label"]
     assert states.current("maya", "summarize_deposition") == "LOCAL"
     assert db.one("SELECT COUNT(*) n FROM evidence")["n"] == 0
