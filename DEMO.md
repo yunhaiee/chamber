@@ -186,6 +186,12 @@ It's privileged, so it can never leave. The record tells the lawyer to check it.
 **Why not LFM2.5-24B-A2B?**
 On this laptop it kept reasoning with thinking off, returned empty replies and took 12-35s a task. It wasn't tested on a PGX.
 
+**Can a pasted document talk d1 into sending it to the cloud?**
+We tested 136 attack cases: "ignore your instructions," fake system notes, fake approvals, claims that it's public, burying it in public text, base64, hex, rot13, reversed and spaced-out text. None would reach the cloud. d1 alone resisted the instructions. It could not read encoded text, so we added a fixed rule: text that can't be read doesn't leave. Run it yourself with `scripts/redteam_d1.py`. These are our own attacks, so it's a test and not a guarantee.
+
+**Could an instruction inside a document make the model do something?**
+Actions planned while working on privileged text are logged and never run.
+
 **How does d1 do?**
 On 144 prepared requests it picked the right kind every time, at about 0.4s median. No privileged request scored as public at the 0.30 threshold, and 5 of 24 public questions were held back as false alarms.
 

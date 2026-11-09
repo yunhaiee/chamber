@@ -4,7 +4,7 @@ import random
 import re
 import threading
 
-from . import audit, checks, cloud, db, decisions, leak, llm, localq, masking, net, prepared, prompts, states, walls
+from . import audit, checks, cloud, db, decisions, guards, leak, llm, localq, masking, net, prepared, prompts, states, walls
 
 PRIVILEGED_AT = 0.30
 JUDGMENT_AT = 0.70  # calibrated on the prepared set: advice min 0.70, everything else max 0.67
@@ -160,7 +160,8 @@ def _finish_box(rid, user_row, kind, parsed, ms, sentence, refused=False, why=No
     else:
         label = f"ON DEVICE · {why + ' · ' if why else ''}{model} · {ms / 1000:.1f}s"
     _update(rid, destination="box", status="done", reply=reply, shown="box", label=label)
-    _record_actions(rid, parsed, executed=True)
+    # Text in a privileged file or pasted email may try to instruct the model, so its planned actions are captured, never run.
+    _record_actions(rid, parsed, executed=not why)
     audit.append(user_row["id"], "request" if not refused else "refused", "blocked" if refused else "box", sentence)
 
 
@@ -168,6 +169,26 @@ def _queue_for_lawyer(rid, user_row, kind, text, title, reason):
     db.run("INSERT INTO queue (request_id, assignee, reason, ts) VALUES (?,?,?,?)", rid, "ruth", reason, db.now())
     _update(rid, destination="lawyer", status="queued", reply=f"Added to {LAWYER_NAME}'s queue.", label=f"HUMAN · Added to {LAWYER_NAME}'s queue.")
     audit.append(user_row["id"], "request", "lawyer", f"{_ask_text(user_row['name'], kind, title, text)} Sent to {LAWYER_NAME}'s queue. No AI answered.")
+
+
+def hard_rules(text, has_docs, d1):
+    """Rules d1 cannot overrule."""
+    hard = []
+    if has_docs:
+        hard.append("attached document")
+    if MARKER.search(text):
+        hard.append("privilege marker")
+    if d1 is None:
+        hard.append("d1 unavailable")
+    if guards.looks_encoded(text):
+        hard.append("unreadable text")
+    return hard
+
+
+def would_leave(text, d1):
+    """Would this text be allowed to reach the cloud? Used by the attack test."""
+    score = d1["privileged"] if d1 else 1.0
+    return score < PRIVILEGED_AT and not hard_rules(text, False, d1)
 
 
 def view(rid):
@@ -245,13 +266,7 @@ def handle(user_row, text, doc_ids=(), source="chat"):
     d1 = decisions.ask(kinds, text, bodies) if kinds else None
 
     # 4. Hard rules d1 can't overrule.
-    hard = []
-    if bodies:
-        hard.append("attached document")
-    if MARKER.search(text):
-        hard.append("privilege marker")
-    if d1 is None:
-        hard.append("d1 unavailable")
+    hard = hard_rules(text, bool(bodies), d1)
 
     if prep:
         kind = prep["kind"]
@@ -276,6 +291,8 @@ def handle(user_row, text, doc_ids=(), source="chat"):
         why = "marked privileged"
     elif d1 is None:
         why = "d1 unavailable"
+    elif "unreadable text" in hard:
+        why = "unreadable text"
     else:
         why = f"d1 privileged {privileged_score:.2f}"
 

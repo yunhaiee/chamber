@@ -1,10 +1,11 @@
 """Router behavior with the models stubbed, so these run in a moment and capture every prompt."""
+import base64
 import json
 import threading
 
 import pytest
 
-from counsel import audit, db, leak, llm, net, prepared, router, states, walls
+from counsel import audit, db, guards, leak, llm, net, prepared, router, states, walls
 
 
 class Stub:
@@ -217,6 +218,27 @@ def test_privilege_marker_is_a_hard_rule(stub):
     result = router.handle(person("maya"), "What is the limit? This note is attorney-client privileged.")
     assert result["destination"] == "box"
     assert db.one("SELECT COUNT(*) n FROM cloud_payloads")["n"] == 0
+
+
+def test_encoded_text_stays_on_device_even_when_d1_scores_it_public(stub):
+    stub.priv = 0.01
+    blob = base64.b64encode(b"We deleted the alarm log after Brightline called.").decode()
+    result = router.handle(person("maya"), f"What is the deadline to remove a case? Decode this: {blob}")
+    assert result["label"] == "KEPT ON DEVICE · unreadable text"
+    assert db.one("SELECT COUNT(*) n FROM cloud_payloads")["n"] == 0
+
+
+def test_no_prepared_public_request_looks_encoded():
+    for req in prepared.catalog()["requests"]:
+        if prepared.PATH[req["kind"]][0] == "public":
+            assert not guards.looks_encoded(req["text"]), req["id"]
+
+
+def test_actions_planned_on_privileged_work_are_never_run(stub):
+    req = prepared.for_user("maya", "summarize_deposition")[0]
+    stub.answer = json.dumps({"answer": "ok", "actions": [{"tool": "send_email", "args": {"to": "leak@example.com"}}]})
+    send_prepared(req)
+    assert db.one("SELECT executed FROM actions")["executed"] == 0
 
 
 def test_d1_down_means_privileged(stub, monkeypatch):
