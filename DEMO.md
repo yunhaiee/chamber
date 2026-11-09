@@ -67,7 +67,7 @@ So we don't draw the line. Each model has to earn it."
 |---|---|
 | Maya | Click **Public lookup**, Enter. Press **Both good**. Do this 3 times. |
 
-Correct answers: December 12, 2026, Dept 330 · November 22, 2026, Dept 389 · November 19, 2026, Dept 489.
+Correct answers: December 12, 2026, Dept 330 · September 13, 2026, Dept 386 · September 1, 2026, Dept 372.
 
 **You should see:** on the Board, Maya's **Public lookup** goes from Testing to **On device**.
 
@@ -84,9 +84,9 @@ Correct answers: December 12, 2026, Dept 330 · November 22, 2026, Dept 389 · N
 
 ### 1:10 Privileged work (20s)
 
-**1. A privileged file.** Maya: click **Summarize deposition**. Point at the **PRIVILEGED FILE** tag, then press Enter.
+**1. A privileged file.** Maya: click **Summarize deposition**. Point at the **Privileged file** tag, then press Enter.
 
-**You should see:** `ON DEVICE · PRIVILEGED FILE ATTACHED`
+**You should see:** `ON DEVICE · privileged file attached`
 
 **Say:** "If a lawyer attaches a client file, it stays on device. That's a fixed rule."
 
@@ -98,7 +98,7 @@ Don't read the bullets aloud, because the summary runs long.
 What is the deadline to remove a case to federal court? Here is the email from our client: 'Maya, please keep this between us. We deleted the alarm log after Brightline called, and I am worried about it.'
 ```
 
-**You should see:** `KEPT ON DEVICE · D1 PRIVILEGED 0.90`
+**You should see:** `KEPT ON DEVICE · d1 privileged 0.90`
 
 **Say:** "No file here, just a question with a client's email pasted in. d1 catches it, and the router refuses to send it."
 
@@ -106,7 +106,7 @@ What is the deadline to remove a case to federal court? Here is the email from o
 
 | Pane | Do | You should see |
 |---|---|---|
-| Maya | Open the model menu at top right. Choose **Liquid · lfm2.5:8b**. | Maya's board empties |
+| Maya | Open the model menu next to the send button. Choose **Liquid · lfm2.5:8b**. | Maya's board empties |
 | Maya | Choose **Liquid · lfm3:1.7b** again. | Her rows return |
 
 **Say:** "Each Liquid model earns its own record, because each can do different things."
@@ -169,7 +169,7 @@ Don't decide what runs locally. Let the local model prove it."
 - The firm, its matters and documents are synthetic. Every route, check and log entry on screen is real and live.
 - This runs on a Mac laptop, and the header shows the real machine name. It hasn't been run on dedicated AI hardware yet.
 - 3 trials is a demo bar. A real firm would need far more.
-- "Privileged text sent 0" means our leak test found none. d1 can misjudge, which is why thresholds lean toward privileged and hard rules back it up. This reduces risk. It doesn't replace a firm's ethics obligations.
+- "Privileged text sent 0" means our leak test found none. It catches exact client names, secrets, emails and runs of 8 words from a document, so a paraphrase would get past it. d1 can misjudge, which is why thresholds lean toward privileged and hard rules back it up. This reduces risk. It doesn't replace a firm's ethics obligations.
 - Research answers come from the cloud and still need checking against the source. This isn't legal advice.
 - Nobody has asked a law firm yet, so ask people in the room.
 

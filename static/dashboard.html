@@ -17,7 +17,7 @@ function shell() {
 }
 function renderTabs() {
   const el = document.getElementById('tabs');
-  el.innerHTML = TABS.map(([id, name]) => `<button class="tab ${ui.tab === id ? 'on' : ''}" data-tab="${id}">${name}</button>`).join(' &nbsp;&nbsp; ');
+  el.innerHTML = TABS.map(([id, name]) => `<button class="tab ${ui.tab === id ? 'on' : ''}" data-tab="${id}">${name}</button>`).join('');
   el.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
 }
 function go(tab) { ui.tab = tab; ui.last = {}; renderTabs(); document.getElementById('main').innerHTML = ''; tick(); }
@@ -40,7 +40,7 @@ function renderBoard(data) {
   const main = document.getElementById('main');
   const known = ui.types;
   ui.types = new Map();
-  main.innerHTML = data.people.map(p => `<section class="band"><div class="eyebrow">${esc(p.name)} &nbsp; ${esc(p.model)}</div>
+  main.innerHTML = data.people.map(p => `<section class="band"><div class="bandhead">${esc(p.name)}<span class="muted">${esc(p.model)}</span></div>
     <table class="board"><tr class="eyebrow"><th>Task</th><th>Type</th></tr>
     ${p.rows.map(r => {
       const id = `${p.user}/${r.kind}`;

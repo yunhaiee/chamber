@@ -205,7 +205,6 @@ def view(rid):
         "can_fix": row["shown"] == "box" and row["status"] == "done" and row["state_at_time"] == "PROVEN",
         "ask": "choose" if row["status"] == "choose" else None,
         "options": ({k: v for k, v in json.loads(row["options"]).items() if k in ("a", "b")} if row["status"] == "choose" and row["options"] else None),
-        "research_only": bool(row["label"] and row["label"].startswith("KEPT ON DEVICE")),
     }
 
 
@@ -431,20 +430,6 @@ def record_fix(user_id, rid):
     states.record(user_id, row["kind"], False, rid)
     audit.append(user_id, "fix", None, f"{db.one('SELECT name FROM users WHERE id=?', user_id)['name']} had to fix a box answer.")
     return True
-
-
-def rewrite_question(user_id, rid):
-    """Rewrite a refused research question with no client facts. The person approves the exact text."""
-    row = db.one("SELECT * FROM requests WHERE id=? AND user=?", rid, user_id)
-    if row is None:
-        return None
-    system = (
-        "Rewrite the message as a single public legal research question. Remove every client name, party, fact, date and "
-        'quotation from any email. Keep only the legal rule being asked about. Reply with one JSON object and nothing else: {"answer": "<the question>", "actions": []}.'
-    )
-    raw, _ = localq.run(lambda: llm.local_chat(system, row["text"]))
-    parsed = llm.first_json(raw) or {}
-    return parsed.get("answer") if isinstance(parsed.get("answer"), str) else None
 
 
 def leak_count():

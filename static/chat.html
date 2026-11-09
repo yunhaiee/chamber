@@ -8,7 +8,7 @@ const root = document.getElementById('root');
 const SHORT = { summarize_deposition: 'Summarize deposition', extract_dates: 'Pull dates', privilege_tag: 'Privilege tag', draft_letter: 'Letter', public_research: 'Research', advice: 'Advice',
   summarize_instrument: 'Summarize will', extract_beneficiaries: 'Beneficiaries', compute_distribution: 'Distributions', draft_client_letter: 'Client letter', public_deadline: 'Public lookup', public_limit: 'Fee or limit' };
 const DOTS = '<div class="thinking" aria-label="Working"><span></span><span></span><span></span></div>';
-const state = { me: null, last: '', tryItems: [], docs: [], attached: [], tried: null, sending: null, expanded: new Set(), rewrites: {} };
+const state = { me: null, last: '', tryItems: [], docs: [], attached: [], tried: null, sending: null, expanded: new Set() };
 
 function destClass(label) {
   if (!label) return '';
@@ -20,23 +20,38 @@ function destClass(label) {
 }
 
 function shell() {
-  root.innerHTML = `<div class="chat">
-    <header><div>${esc(state.me.name)} · ${esc(state.me.matters.map(m => m.name).join(', '))}</div><div class="headright"><div class="modelmenu" id="modelmenu"><button type="button" id="modelbtn" aria-haspopup="listbox"></button><div class="modellist" id="modellist" role="listbox" hidden></div></div><span id="online" class="muted"></span></div></header>
+  root.innerHTML = `<div class="chat empty" id="chat">
+    <header><div>${esc(state.me.name)} · ${esc(state.me.matters.map(m => m.name).join(', '))}</div><span id="online" class="muted"></span></header>
     <div class="log" id="log"></div>
-    <div class="attached" id="attached"></div>
-    <div class="tools"><div class="attachmenu" id="attachmenu"><button type="button" id="attachbtn">+ Attach file</button><div class="attachlist" id="attachlist" hidden></div></div><span id="try"></span></div>
-    <div class="composer"><textarea id="text" placeholder="Message" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false" spellcheck="false"></textarea><button id="send">Send</button></div>
+    <div class="tools"><div id="try"></div></div>
+    <div class="composerwrap"><div class="composer">
+      <div class="attached" id="attached"></div>
+      <textarea id="text" rows="1" placeholder="Ask anything" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false" spellcheck="false"></textarea>
+      <div class="composerrow">
+        <div class="attachmenu" id="attachmenu"><button type="button" id="attachbtn">+ Attach file</button><div class="attachlist" id="attachlist" hidden></div></div>
+        <span class="spacer"></span>
+        <div class="modelmenu" id="modelmenu"><button type="button" id="modelbtn" aria-haspopup="listbox"></button><div class="modellist" id="modellist" role="listbox" hidden></div></div>
+        <button id="send" aria-label="Send">↑</button>
+      </div>
+    </div></div>
   </div>`;
   document.getElementById('attachbtn').onclick = () => { const l = document.getElementById('attachlist'); l.hidden = !l.hidden; };
   const text = document.getElementById('text');
   text.onkeydown = ev => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); send(); } };
-  text.oninput = () => { if (state.tried && text.value !== state.tried.text) state.tried = null; };
+  text.oninput = () => { autosize(); if (state.tried && text.value !== state.tried.text) state.tried = null; };
   document.getElementById('send').onclick = send;
   document.getElementById('modelbtn').onclick = () => { const l = document.getElementById('modellist'); l.hidden = !l.hidden; };
+  window.addEventListener('blur', () => { document.getElementById('modellist').hidden = true; document.getElementById('attachlist').hidden = true; });
   document.addEventListener('click', ev => {
     if (!ev.target.closest('#modelmenu')) document.getElementById('modellist').hidden = true;
     if (!ev.target.closest('#attachmenu')) document.getElementById('attachlist').hidden = true;
   });
+}
+
+function autosize() {
+  const t = document.getElementById('text');
+  t.style.height = 'auto';
+  t.style.height = Math.min(t.scrollHeight, 160) + 'px';
 }
 
 function renderModelMenu() {
@@ -67,10 +82,11 @@ function showAttached() {
 async function loadTry() {
   state.tryItems = await api('/api/try');
   document.getElementById('try').innerHTML = state.tryItems.map((t, i) =>
-    `<button class="try" data-i="${i}">${esc(SHORT[t.kind] || t.label)}</button>`).join(' &nbsp; ');
+    `<button class="try" data-i="${i}">${esc(SHORT[t.kind] || t.label)}${t.doc_ids.length ? '<span class="filemark">+ file</span>' : ''}</button>`).join('');
   document.querySelectorAll('.try').forEach(b => b.onclick = () => {
     const t = state.tryItems[Number(b.dataset.i)];
     document.getElementById('text').value = t.text;
+    autosize();
     state.attached = [...t.doc_ids];
     state.tried = t;
     showAttached();
@@ -85,7 +101,7 @@ async function send(textOverride) {
   const docIds = typeof textOverride === 'string' ? [] : state.attached;
   const tried = typeof textOverride === 'string' ? null : state.tried;
   state.sending = { text };
-  if (typeof textOverride !== 'string') { box.value = ''; state.attached = []; state.tried = null; showAttached(); }
+  if (typeof textOverride !== 'string') { box.value = ''; autosize(); state.attached = []; state.tried = null; showAttached(); }
   render();
   try {
     if (tried) await post('/api/try/used', { kind: tried.kind });
@@ -100,20 +116,17 @@ function messageHtml(m) {
   const cls = destClass(m.label);
   let extra = '';
   if (m.can_fix) extra += `<button data-fix="${m.id}">I had to fix this</button>`;
-  if (m.research_only) extra += ` &nbsp; <button data-rewrite="${m.id}">Send only the question</button>`;
-  const rewrite = state.rewrites[m.id];
   if (m.ask === 'choose') {
-    return `<div class="ask"><div class="body ${long && !open ? 'short' : ''}" data-open="${m.id}">${esc(m.text)}</div></div>
-      <div><div class="pair"><div><div class="eyebrow">A</div><div class="reply">${esc(m.options.a)}</div></div><div><div class="eyebrow">B</div><div class="reply">${esc(m.options.b)}</div></div></div>
+    return `<div class="ask"><div class="bubble"><div class="body ${long && !open ? 'short' : ''}" data-open="${m.id}">${esc(m.text)}</div></div></div>
+      <div><div class="pair"><div><div class="eyebrow">Answer A</div><div class="reply">${esc(m.options.a)}</div></div><div><div class="eyebrow">Answer B</div><div class="reply">${esc(m.options.b)}</div></div></div>
       <div class="small choices"><button data-pick="a" data-id="${m.id}">A is better</button><button data-pick="b" data-id="${m.id}">B is better</button><button data-pick="both" data-id="${m.id}">Both good</button><button data-pick="neither" data-id="${m.id}">Neither</button></div></div>`;
   }
-  return `<div class="ask"><div class="body ${long && !open ? 'short' : ''}" data-open="${m.id}">${esc(m.text)}</div>
+  return `<div class="ask"><div class="bubble"><div class="body ${long && !open ? 'short' : ''}" data-open="${m.id}">${esc(m.text)}</div></div>
       ${m.docs.map(d => `<div><span class="attachment"><span class="eyebrowish">Privileged file</span>${esc(d)}</span></div>`).join('')}</div>
     <div>${m.reply && !(m.label || '').startsWith('HUMAN') ? `<div class="reply">${esc(m.reply)}</div>` : ''}
       ${m.label ? `<div class="line dest ${cls}">${esc(m.label)}</div>` : ''}
       ${m.status === 'working' ? DOTS : ''}
       ${extra ? `<div class="small">${extra}</div>` : ''}
-      ${rewrite ? `<div class="rewrite"><div class="mono">${esc(rewrite)}</div><button data-send-rewrite="${m.id}">Send</button></div>` : ''}
     </div>`;
 }
 
@@ -122,13 +135,13 @@ function render() {
   const log = document.getElementById('log');
   if (!log) return;
   const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
-  log.innerHTML = messages.map(messageHtml).join('') + (state.sending && !messages.some(m => m.status === 'working' && m.text === state.sending.text) ? `<div class="ask"><div class="body short">${esc(state.sending.text)}</div></div>${DOTS}` : '');
+  const empty = !messages.length && !state.sending;
+  document.getElementById('chat').classList.toggle('empty', empty);
+  log.innerHTML = empty ? `<div class="hello">Hi ${esc(state.me.name.split(' ')[0])}, where should we start?</div>` : messages.map(messageHtml).join('') + (state.sending && !messages.some(m => m.status === 'working' && m.text === state.sending.text) ? `<div class="ask"><div class="bubble"><div class="body short">${esc(state.sending.text)}</div></div></div>${DOTS}` : '');
   if (nearBottom || state.sending) log.scrollTop = log.scrollHeight;
   log.querySelectorAll('[data-open]').forEach(el => el.onclick = () => { const id = Number(el.dataset.open); state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id); render(); });
   log.querySelectorAll('[data-pick]').forEach(b => b.onclick = async () => { await post('/api/pick', { request_id: Number(b.dataset.id), choice: b.dataset.pick }); state.last = ''; poll(); });
   log.querySelectorAll('[data-fix]').forEach(b => b.onclick = async () => { await post('/api/fix', { request_id: Number(b.dataset.fix) }); b.textContent = 'Recorded'; });
-  log.querySelectorAll('[data-rewrite]').forEach(b => b.onclick = async () => { b.textContent = '…'; const r = await post('/api/research-only', { request_id: Number(b.dataset.rewrite) }); state.rewrites[b.dataset.rewrite] = r.text; render(); });
-  log.querySelectorAll('[data-send-rewrite]').forEach(b => b.onclick = () => { const id = b.dataset.sendRewrite; const t = state.rewrites[id]; delete state.rewrites[id]; send(t); });
 }
 
 async function poll() {

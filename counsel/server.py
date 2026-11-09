@@ -178,14 +178,6 @@ def pick(body: dict, user=Depends(associate)):
     return result
 
 
-@app.post("/api/research-only")
-def research_only(body: dict, user=Depends(associate)):
-    text = router.rewrite_question(user["id"], int(body.get("request_id", 0)))
-    if text is None:
-        raise HTTPException(404, "Not found")
-    return {"text": text}
-
-
 @app.get("/api/board")
 def board(_user=Depends(partner)):
     return {
