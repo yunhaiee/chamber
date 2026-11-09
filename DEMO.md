@@ -36,7 +36,7 @@ curl -s localhost:11434/api/chat -d '{"model":"lfm3:1.7b","stream":false,"messag
 
 **Check:** the board is empty and the chat says Online.
 
-**To rehearse again:** rerun `./scripts/clean_start.sh 8000` and refresh the page. It wipes everything.
+**To rehearse again:** click **Reset** at the top right, then click it again to confirm. It erases all history and reloads the page. It says `Still working` until any running request or firm's day finishes. If the app itself is misbehaving, rerun `./scripts/clean_start.sh 8000` and refresh.
 
 **In chat:** on a new chat, click a task in the list. Once a chat has started, open **Tasks** next to `+ Attach file`, pick the task, then press Enter.
 

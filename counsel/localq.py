@@ -10,6 +10,7 @@ DAY = 1
 _jobs = queue.PriorityQueue()
 _seq = itertools.count()
 _started = False
+_open = 0
 _lock = threading.Lock()
 
 
@@ -32,7 +33,20 @@ def _ensure():
 
 def run(fn, priority=CHAT):
     """Run fn on the local worker and wait for its result."""
+    global _open
     _ensure()
     future = Future()
+    with _lock:
+        _open += 1
     _jobs.put((priority, next(_seq), fn, future))
-    return future.result()
+    try:
+        return future.result()
+    finally:
+        with _lock:
+            _open -= 1
+
+
+def busy():
+    """True while any local call is queued or running."""
+    with _lock:
+        return _open > 0

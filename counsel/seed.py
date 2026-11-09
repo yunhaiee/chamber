@@ -10,8 +10,26 @@ ROOT = Path(__file__).parent.parent
 DATA = Path(os.environ.get("SH_DATA", ROOT / "data"))
 
 
+HISTORY = ("requests", "evidence", "cloud_evidence", "row_events", "queue", "audit", "cloud_payloads",
+           "actions", "try_pointer", "user_models", "mask_items")
+
+
 def load():
     return json.loads((ROOT / "seed" / "users.json").read_text())
+
+
+def clear_history():
+    """Everything people did goes, in one transaction. The firm and signed-in sessions stay."""
+    connection = db.conn()
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        for table in HISTORY:
+            connection.execute(f"DELETE FROM {table}")
+        masking.seed_defaults()
+        connection.execute("COMMIT")
+    except Exception:
+        connection.execute("ROLLBACK")
+        raise
 
 
 def firm(data_dir=None):

@@ -11,7 +11,7 @@ import socket
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, PlainTextResponse
 
-from . import audit, day, db, leak, llm, masking, net, prepared, router, seed, states, walls
+from . import audit, day, db, leak, llm, localq, masking, net, prepared, router, seed, states, walls
 
 ROOT = Path(__file__).parent.parent
 STATIC = ROOT / "static"
@@ -66,18 +66,35 @@ def login(body: dict, response: Response):
 
 
 DEMO_PANES = {"left": "maya", "right": "daniel", "partner": "ruth"}
+STUCK_AFTER = 300  # a request still "working" after this long has died and must not block a reset
+
+
+def _demo_only(request):
+    client = request.client.host if request.client else ""
+    if os.environ.get("SH_DEMO") != "1" or client not in ("127.0.0.1", "::1", "testclient"):
+        raise HTTPException(404, "Not found")
 
 
 @app.post("/api/demo-login")
 def demo_login(body: dict, request: Request, response: Response):
     """Projector convenience: signs a pane in. Off unless SH_DEMO=1, and loopback only."""
-    client = request.client.host if request.client else ""
-    if os.environ.get("SH_DEMO") != "1" or client not in ("127.0.0.1", "::1", "testclient"):
-        raise HTTPException(404, "Not found")
+    _demo_only(request)
     user_id = DEMO_PANES.get(body.get("pane"))
     if not user_id:
         raise HTTPException(404, "Not found")
     return {"token": _start_session(response, user_id), "user": user_id}
+
+
+@app.post("/api/demo-reset")
+def demo_reset(request: Request, _user=Depends(partner)):
+    """Start the demo over. Refused while work is running, so nothing lands in the clean database."""
+    _demo_only(request)
+    recent = db.one("SELECT COUNT(*) n FROM requests WHERE status='working' AND ts>?", db.now() - STUCK_AFTER)["n"]
+    if recent or day.status()["day"]["running"] or localq.busy():
+        raise HTTPException(409, "Still working")
+    seed.clear_history()
+    day.reset()
+    return {"ok": True}
 
 
 @app.get("/api/me")

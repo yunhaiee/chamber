@@ -1,4 +1,4 @@
-from counsel import db, prepared, walls
+from counsel import audit, db, prepared, walls
 from tests.conftest import sign_in
 
 NOT_FOUND = "No document called that in your matters."
@@ -42,6 +42,49 @@ def test_signed_out_is_refused(client):
 
 def test_demo_login_is_off_by_default(client):
     assert client.post("/api/demo-login", json={"pane": "left"}).status_code == 404
+
+
+def test_demo_reset_is_off_by_default(client):
+    ruth = sign_in(client, "ruth", "3333")
+    assert client.post("/api/demo-reset", headers=ruth).status_code == 404
+
+
+def test_demo_reset_is_partner_only(client, monkeypatch):
+    monkeypatch.setenv("SH_DEMO", "1")
+    maya = sign_in(client, "maya", "1111")
+    assert client.post("/api/demo-reset", headers=maya).status_code == 404
+
+
+def test_demo_reset_clears_history_and_keeps_the_firm(client, monkeypatch):
+    monkeypatch.setenv("SH_DEMO", "1")
+    ruth = sign_in(client, "ruth", "3333")
+    defaults = db.one("SELECT COUNT(*) n FROM mask_items")["n"]
+    users = db.one("SELECT COUNT(*) n FROM users")["n"]
+    documents = db.one("SELECT COUNT(*) n FROM documents")["n"]
+    db.run("INSERT INTO requests (user, source, text, status, ts) VALUES ('maya','chat','hi','done',?)", db.now())
+    db.run("INSERT INTO row_events (user, kind, model, to_state, ts) VALUES ('maya','public_limit','m','PROVEN',?)", db.now())
+    db.run("INSERT INTO user_models VALUES ('maya','other')")
+    db.run("INSERT INTO try_pointer VALUES ('maya','public_limit',4)")
+    db.run("INSERT INTO mask_items (grp, key, label) VALUES ('custom','x','x')")
+    audit.append("maya", "request", "box", "Something happened.")
+
+    assert client.post("/api/demo-reset", headers=ruth).status_code == 200
+
+    for table in ("requests", "row_events", "user_models", "try_pointer", "audit"):
+        assert db.one(f"SELECT COUNT(*) n FROM {table}")["n"] == 0
+    assert db.one("SELECT COUNT(*) n FROM mask_items")["n"] == defaults
+    assert db.one("SELECT COUNT(*) n FROM users")["n"] == users
+    assert db.one("SELECT COUNT(*) n FROM documents")["n"] == documents
+    assert client.get("/api/me", headers=ruth).status_code == 200
+    assert client.get("/api/audit", headers=ruth).json()["intact"] is True
+
+
+def test_demo_reset_waits_for_running_work(client, monkeypatch):
+    monkeypatch.setenv("SH_DEMO", "1")
+    ruth = sign_in(client, "ruth", "3333")
+    db.run("INSERT INTO requests (user, source, text, status, ts) VALUES ('maya','chat','hi','working',?)", db.now())
+    assert client.post("/api/demo-reset", headers=ruth).status_code == 409
+    assert db.one("SELECT COUNT(*) n FROM requests")["n"] == 1
 
 
 def test_reference_to_someone_elses_document_matches_missing_document(firm):

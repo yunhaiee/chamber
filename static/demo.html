@@ -6,6 +6,7 @@
     <button class="on" data-pane="maya" role="tab">Maya Chen</button>
     <button data-pane="daniel" role="tab">Daniel Osei</button>
   </div>
+  <button id="reset" class="reset" type="button">Reset</button>
   <div class="stage-chat">
     <iframe id="maya" title="Maya Chen" src="/chat?pane=left"></iframe>
     <iframe id="daniel" title="Daniel Osei" src="/chat?pane=right" hidden></iframe>
@@ -20,4 +21,34 @@ document.querySelectorAll('.switch button').forEach(b => b.onclick = () => {
   const board = document.getElementById('board').contentWindow;
   if (board.setBoardPerson) board.setBoardPerson(b.dataset.pane);
 });
+
+// Two clicks, so a stray one on stage can't wipe the demo.
+const reset = document.getElementById('reset');
+let armed = null;
+function settle(text) {
+  clearTimeout(armed); armed = null;
+  reset.classList.remove('armed');
+  reset.disabled = false;
+  reset.textContent = text;
+  if (text !== 'Reset') setTimeout(() => { if (!armed) reset.textContent = 'Reset'; }, 3000);
+}
+reset.onclick = async () => {
+  if (!armed) {
+    reset.textContent = 'Erase all history?';
+    reset.classList.add('armed');
+    armed = setTimeout(() => settle('Reset'), 4000);
+    return;
+  }
+  clearTimeout(armed);
+  reset.disabled = true;
+  reset.textContent = 'Resetting…';
+  let status = 0;
+  try {
+    let session = '';
+    try { session = sessionStorage.getItem('counsel-token-partner') || ''; } catch {}
+    status = (await fetch('/api/demo-reset', { method: 'POST', headers: { 'x-session': session }, credentials: 'include' })).status;
+  } catch {}
+  if (status === 200) location.reload();
+  else settle(status === 409 ? 'Still working, try shortly' : 'Reset failed');
+};
 </script></body></html>
