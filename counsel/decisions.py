@@ -7,7 +7,7 @@ CRITERIA = {
     "privilege_tag": "Label a document for a privilege log",
     "draft_letter": "Draft a meet-and-confer or discovery letter to opposing counsel",
     "public_research": "Look up a public legal rule, deadline, statute or code section",
-    "public_deadline": "Find or work out a date from a public docket, notice or rule",
+    "public_deadline": "Look up a date, rate or value in a public docket, notice or table",
     "public_limit": "Check a public fee schedule or monetary limit",
     "advice": "Ask for a legal decision or recommendation about what someone should do",
     "summarize_instrument": "Summarize a will, trust or estate instrument",

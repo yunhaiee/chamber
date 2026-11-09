@@ -39,7 +39,7 @@ def _ask_text(user_name, kind, title, text):
         "extract_beneficiaries": f"asked for the beneficiaries in{t}",
         "compute_distribution": f"asked for distribution math on{t}",
         "public_research": "asked a public research question",
-        "public_deadline": "asked about a public deadline",
+        "public_deadline": "asked for a public lookup",
         "public_limit": "asked about a public fee or limit",
     }
     if kind == "advice":
@@ -151,10 +151,14 @@ def _send_cloud(rid, user_row, kind, text, state_word, source, prep=None):
         states.record_cloud(user_row["id"], kind, checks.run(prep["check"], {"answer": result["cloud_out"]})["ok"], rid)
 
 
-def _finish_box(rid, user_row, kind, parsed, ms, sentence, refused=False, privileged=None):
+def _finish_box(rid, user_row, kind, parsed, ms, sentence, refused=False, why=None):
     usable = isinstance(parsed, dict) and "answer" in parsed
     reply = render(parsed["answer"]) if usable else "The on-device model couldn't produce an answer in the expected form."
-    label = f"KEPT ON DEVICE · privileged {privileged:.2f}" if refused else f"ON DEVICE · {states.model(user_row['id'])} · {ms / 1000:.1f}s"
+    model = states.model(user_row["id"])
+    if refused:
+        label = f"KEPT ON DEVICE · {why}"
+    else:
+        label = f"ON DEVICE · {why + ' · ' if why else ''}{model} · {ms / 1000:.1f}s"
     _update(rid, destination="box", status="done", reply=reply, shown="box", label=label)
     _record_actions(rid, parsed, executed=True)
     audit.append(user_row["id"], "request" if not refused else "refused", "blocked" if refused else "box", sentence)
@@ -266,6 +270,15 @@ def handle(user_row, text, doc_ids=(), source="chat"):
     state = states.ensure(user_id, kind, row_path)
     _update(rid, kind=kind, prepared_id=prep["id"] if prep else None, d1=json.dumps(d1), hard_rules=json.dumps(hard), state_at_time=state)
 
+    if bodies:
+        why = "privileged file attached"
+    elif "privilege marker" in hard:
+        why = "marked privileged"
+    elif d1 is None:
+        why = "d1 unavailable"
+    else:
+        why = f"d1 privileged {privileged_score:.2f}"
+
     # 5. Decide.
     if judgment_score >= JUDGMENT_AT or kind == "advice":
         reason = f"judgment {judgment_score:.2f}"
@@ -280,9 +293,9 @@ def handle(user_row, text, doc_ids=(), source="chat"):
         parsed, ms, _ok = result
         if prepared.PATH.get(kind, ("", ""))[0] == "public":
             sentence = f"{user_row['name']}'s research question contained privileged text. Refused to send it to the cloud. Handled on device."
-            _finish_box(rid, user_row, kind, parsed, ms, sentence, refused=True, privileged=max(privileged_score, 0.0))
+            _finish_box(rid, user_row, kind, parsed, ms, sentence, refused=True, why=why)
             return view(rid)
-        _finish_box(rid, user_row, kind, parsed, ms, f"{_ask_text(user_row['name'], kind, title, text)} {BOX_NOTE}")
+        _finish_box(rid, user_row, kind, parsed, ms, f"{_ask_text(user_row['name'], kind, title, text)} {BOX_NOTE}", why=why)
         return view(rid)
 
     # Public path.

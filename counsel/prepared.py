@@ -40,7 +40,7 @@ LABELS = {
     "privilege_tag": "Tag for the privilege log",
     "draft_letter": "Draft a meet-and-confer letter",
     "public_research": "Research",
-    "public_deadline": "Public deadline",
+    "public_deadline": "Public lookup",
     "public_limit": "Public fee or limit",
     "advice": "Advice or a decision",
     "summarize_instrument": "Summarize a will or trust",
@@ -468,19 +468,29 @@ def _docket_deadline(rng, i):
     return text, {"type": "facts", "facts": [{"type": "date", "value": hearing.isoformat()}, {"type": "number", "value": str(dept)}]}
 
 
-def _add_months(d, n):
-    month = d.month - 1 + n
-    return date(d.year + month // 12, month % 12 + 1, min(d.day, 28))
+AFR_TERMS = ["Short-term", "Mid-term", "Long-term"]
+AFR_LEVELS = ["AFR", "110% AFR", "120% AFR", "130% AFR"]
+AFR_PERIODS = ["Annual", "Semiannual", "Quarterly", "Monthly"]
 
 
-def _claim_deadline(rng, i):
-    """Daniel's public deadline: not printed anywhere, so it has to be worked out."""
-    issued = date(2026, rng.randint(9, 12), rng.randint(1, 27))
+def _rate_lookup(rng, i):
+    """Daniel's public lookup: the IRS rate table, laid out as published, with terms as section headings."""
+    values = iter(rng.sample(range(300, 620), len(AFR_TERMS) * len(AFR_LEVELS) * len(AFR_PERIODS)))
+    table, lines = {}, ["Rate | " + " | ".join(AFR_PERIODS)]
+    for term in AFR_TERMS:
+        lines.append(term)
+        for level in AFR_LEVELS:
+            cells = {period: next(values) / 100 for period in AFR_PERIODS}
+            table[(term, level)] = cells
+            lines.append(f"{level} | " + " | ".join(f"{cells[p]:.2f}%" for p in AFR_PERIODS))
+    term, level, period = rng.choice(AFR_TERMS), rng.choice(AFR_LEVELS), rng.choice(AFR_PERIODS)
+    answer = table[(term, level)][period]
     text = (
-        "Under public probate rules, a creditor may file a claim within four months after letters are first issued. "
-        f"Letters were issued on {_nice(issued)}. What is the last day to file? Give it as YYYY-MM-DD."
+        f"Read this public IRS table of applicable federal rates. Give only the {term} {level} rate, {period} compounding.\n\n"
+        + "\n".join(lines)
     )
-    return text, {"type": "facts", "facts": [{"type": "date", "value": _add_months(issued, 4).isoformat()}]}
+    others = [str(v) for cells in table.values() for v in cells.values() if v != answer]
+    return text, {"type": "facts", "facts": [{"type": "number", "value": str(answer)}], "forbid_numbers": others}
 
 
 def _limit_check(value, limit):
@@ -572,9 +582,7 @@ def build():
         add("maya", "public_deadline", text, None, None, check, "harlow")
         text, check = _limit_check(limits[i], 35000 if i % 2 else 12500)
         add("maya", "public_limit", text, None, None, check, "harlow")
-        text, check = _claim_deadline(public, i)
-        while any(r["text"] == text for r in requests):
-            text, check = _claim_deadline(public, i)
+        text, check = _rate_lookup(public, i)
         add("daniel", "public_deadline", text, None, None, check, "rourke")
         text, check = _statutory_fee(fees[i])
         add("daniel", "public_limit", text, None, None, check, "rourke")

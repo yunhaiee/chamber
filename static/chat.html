@@ -6,7 +6,7 @@
 <script>
 const root = document.getElementById('root');
 const SHORT = { summarize_deposition: 'Summarize deposition', extract_dates: 'Pull dates', privilege_tag: 'Privilege tag', draft_letter: 'Letter', public_research: 'Research', advice: 'Advice',
-  summarize_instrument: 'Summarize will', extract_beneficiaries: 'Beneficiaries', compute_distribution: 'Distributions', draft_client_letter: 'Client letter', public_deadline: 'Public deadline', public_limit: 'Fee or limit' };
+  summarize_instrument: 'Summarize will', extract_beneficiaries: 'Beneficiaries', compute_distribution: 'Distributions', draft_client_letter: 'Client letter', public_deadline: 'Public lookup', public_limit: 'Fee or limit' };
 const DOTS = '<div class="thinking" aria-label="Working"><span></span><span></span><span></span></div>';
 const state = { me: null, last: '', tryItems: [], docs: [], attached: [], tried: null, sending: null, expanded: new Set(), rewrites: {} };
 
@@ -24,20 +24,19 @@ function shell() {
     <header><div>${esc(state.me.name)} · ${esc(state.me.matters.map(m => m.name).join(', '))}</div><div class="headright"><div class="modelmenu" id="modelmenu"><button type="button" id="modelbtn" aria-haspopup="listbox"></button><div class="modellist" id="modellist" role="listbox" hidden></div></div><span id="online" class="muted"></span></div></header>
     <div class="log" id="log"></div>
     <div class="attached" id="attached"></div>
-    <div class="tools"><select id="docs"><option value="">Documents ▾</option></select><span id="try"></span></div>
+    <div class="tools"><div class="attachmenu" id="attachmenu"><button type="button" id="attachbtn">+ Attach file</button><div class="attachlist" id="attachlist" hidden></div></div><span id="try"></span></div>
     <div class="composer"><textarea id="text" placeholder="Message" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false" spellcheck="false"></textarea><button id="send">Send</button></div>
   </div>`;
-  document.getElementById('docs').onchange = ev => {
-    const id = Number(ev.target.value); ev.target.value = '';
-    if (id && !state.attached.includes(id)) state.attached.push(id);
-    showAttached();
-  };
+  document.getElementById('attachbtn').onclick = () => { const l = document.getElementById('attachlist'); l.hidden = !l.hidden; };
   const text = document.getElementById('text');
   text.onkeydown = ev => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); send(); } };
   text.oninput = () => { if (state.tried && text.value !== state.tried.text) state.tried = null; };
   document.getElementById('send').onclick = send;
   document.getElementById('modelbtn').onclick = () => { const l = document.getElementById('modellist'); l.hidden = !l.hidden; };
-  document.addEventListener('click', ev => { if (!ev.target.closest('#modelmenu')) document.getElementById('modellist').hidden = true; });
+  document.addEventListener('click', ev => {
+    if (!ev.target.closest('#modelmenu')) document.getElementById('modellist').hidden = true;
+    if (!ev.target.closest('#attachmenu')) document.getElementById('attachlist').hidden = true;
+  });
 }
 
 function renderModelMenu() {
@@ -60,8 +59,8 @@ function showAttached() {
   const el = document.getElementById('attached');
   el.innerHTML = state.attached.map(id => {
     const d = state.docs.find(x => x.id === id);
-    return `${esc(d ? d.title : '')} <button data-rm="${id}" class="muted">×</button>`;
-  }).join(' &nbsp; ');
+    return `<span class="attachment"><span class="eyebrowish">Privileged file</span>${esc(d ? d.title : '')} <button type="button" data-rm="${id}">×</button></span>`;
+  }).join(' ');
   el.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { state.attached = state.attached.filter(x => x !== Number(b.dataset.rm)); showAttached(); });
 }
 
@@ -109,7 +108,7 @@ function messageHtml(m) {
       <div class="small choices"><button data-pick="a" data-id="${m.id}">A is better</button><button data-pick="b" data-id="${m.id}">B is better</button><button data-pick="both" data-id="${m.id}">Both good</button><button data-pick="neither" data-id="${m.id}">Neither</button></div></div>`;
   }
   return `<div class="ask"><div class="body ${long && !open ? 'short' : ''}" data-open="${m.id}">${esc(m.text)}</div>
-      ${m.docs.map(d => `<div class="doc">${esc(d)}</div>`).join('')}</div>
+      ${m.docs.map(d => `<div><span class="attachment"><span class="eyebrowish">Privileged file</span>${esc(d)}</span></div>`).join('')}</div>
     <div>${m.reply && !(m.label || '').startsWith('HUMAN') ? `<div class="reply">${esc(m.reply)}</div>` : ''}
       ${m.label ? `<div class="line dest ${cls}">${esc(m.label)}</div>` : ''}
       ${m.status === 'working' ? DOTS : ''}
@@ -150,8 +149,14 @@ signIn(root, pane, async () => {
   if (state.me.role === 'partner') { location.href = '/'; return; }
   shell();
   state.docs = await api('/api/docs');
-  const sel = document.getElementById('docs');
-  state.docs.forEach(d => { const o = document.createElement('option'); o.value = d.id; o.textContent = d.title; sel.appendChild(o); });
+  const list = document.getElementById('attachlist');
+  list.innerHTML = state.docs.map(d => `<button type="button" data-doc="${d.id}">${esc(d.title)}</button>`).join('');
+  list.querySelectorAll('[data-doc]').forEach(b => b.onclick = () => {
+    const id = Number(b.dataset.doc);
+    if (!state.attached.includes(id)) state.attached.push(id);
+    list.hidden = true;
+    showAttached();
+  });
   await loadTry();
   await poll();
   setInterval(poll, 1000);

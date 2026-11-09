@@ -57,7 +57,7 @@ Nothing to click. Boards are empty.
 
 **Say:** "Firms want to move to on-device AI, because client files can't go to the cloud. But what happens when the work stops getting done after the switch? That's why you need a hybrid: some work local, some in the cloud.
 
-So where's the line? You could draw a fixed one. But nobody knows what a small model can really do with a lawyer's work. It differs between firms, between roles, even between two people doing the same task in different practices.
+So where's the line? You could draw a fixed one. But nobody knows what a small model can really do with a lawyer's work. It differs between firms, between roles, even between two people doing the same task.
 
 So we don't draw the line. Each model has to earn it."
 
@@ -65,53 +65,51 @@ So we don't draw the line. Each model has to earn it."
 
 | Pane | Do |
 |---|---|
-| Maya | Click **Public deadline**, Enter. Two unlabeled answers appear. Press **Both good**. Repeat 3 times. |
+| Maya | Click **Public lookup**, Enter. Press **Both good**. Do this 3 times. |
 
-| Try | Correct answer |
-|---|---|
-| 1 | December 12, 2026, Dept 330 |
-| 2 | November 22, 2026, Dept 389 |
-| 3 | November 19, 2026, Dept 489 |
+Correct answers: December 12, 2026, Dept 330 · November 22, 2026, Dept 389 · November 19, 2026, Dept 489.
 
-**You should see:** on the Board, Maya's **Public deadline** goes from Testing to **On device**.
+**You should see:** on the Board, Maya's **Public lookup** goes from Testing to **On device**.
 
-**Say:** "Liquid's d1 model reads every request on this device and decides where it can go. This one's public, so new work runs on both models, and the lawyer picks without knowing which is which. Three right, and the cloud stops being called."
+**Say:** "Liquid's d1 model reads every request on this device and decides where it can go. This one is public, so both models answer, and the lawyer picks without knowing which is which. After three good answers, the cloud stops being called."
 
 ### 0:55 Masking (15s)
 
 | Pane | Do |
 |---|---|
 | Maya | Click **Research**, Enter. Pick the answer that says **4 years, § 337**. |
-| Dashboard | Press `2`, and point at `[CLIENT_1]` and the Key. Press `1` to go back. |
+| Dashboard | Press `2`. Point at `[CLIENT_1]` and the Key. Press `1` to go back. |
 
-**Say:** "When work does go to the cloud, the client's name doesn't. The key stays on this device, and we swap the name back here."
+**Say:** "When work goes to the cloud, the client's name doesn't. The key stays here, and we swap the name back here."
 
 ### 1:10 Privileged work (20s)
 
-| Pane | Do | You should see |
-|---|---|---|
-| Maya | Click **Summarize deposition**, Enter | `ON DEVICE · lfm3:1.7b` |
+**1. A privileged file.** Maya: click **Summarize deposition**. Point at the **PRIVILEGED FILE** tag, then press Enter.
 
-Point at the label. Don't read the bullets aloud, because the summary runs long.
+**You should see:** `ON DEVICE · PRIVILEGED FILE ATTACHED`
 
-Paste this into Maya's box:
+**Say:** "If a lawyer attaches a client file, it stays on device. That's a fixed rule."
+
+Don't read the bullets aloud, because the summary runs long.
+
+**2. Privileged text inside a question.** Paste this into Maya's box:
 
 ```
 What is the deadline to remove a case to federal court? Here is the email from our client: 'Maya, please keep this between us. We deleted the alarm log after Brightline called, and I am worried about it.'
 ```
 
-**You should see:** `KEPT ON DEVICE · privileged 0.90`
+**You should see:** `KEPT ON DEVICE · D1 PRIVILEGED 0.90`
 
-**Say:** "d1 sees a public question with a privileged email pasted in, scores it 0.90, and the router refuses to send it. Privileged text only ever runs on device."
+**Say:** "No file here, just a question with a client's email pasted in. d1 catches it, and the router refuses to send it."
 
 ### 1:30 History is per model (10s)
 
 | Pane | Do | You should see |
 |---|---|---|
-| Maya | Change the model at top right to **Liquid · lfm2.5:8b** | Maya's board empties |
-| Maya | Change it back to **Liquid · lfm3:1.7b** | Her rows return |
+| Maya | Open the model menu at top right. Choose **Liquid · lfm2.5:8b**. | Maya's board empties |
+| Maya | Choose **Liquid · lfm3:1.7b** again. | Her rows return |
 
-**Say:** "Which Liquid model can do what really differs, so every model earns its own record."
+**Say:** "Each Liquid model earns its own record, because each can do different things."
 
 **Change it back before going on.**
 
@@ -121,14 +119,18 @@ What is the deadline to remove a case to federal court? Here is the email from o
 |---|---|---|
 | Daniel | Type `Summarize the Harlow deposition.` | `No document called that in your matters.` |
 
-**Say:** "Maya and Daniel share the same on-device model on the same hardware, and Daniel still can't see her files. He can't even learn that document exists. Today this runs on my Mac. In a firm, it would run on a dedicated AI machine in the office."
+**Say:** "Same on-device model, same hardware, and Daniel still can't see Maya's files. He can't even tell the file exists. Today this runs on my Mac. In a firm, it would run on a dedicated AI machine in the office."
 
-### 2:00 The firm's day, then same task, different home (25s)
-Press `f` on the dashboard. Press `1` if you aren't on the Board. Give it about 20 seconds.
+### 2:00 Same task, different result (25s)
+Press `f` on the dashboard, and press `1` if you aren't on the Board.
 
-**You should see:** Daniel's **Public deadline** and **Public fee or limit** land in **Cloud**. Maya's are **On device**.
+**Say:** "Let's send a lot of different tasks quickly and see how they split."
 
-**Say:** "That's the rest of the firm's day. Same task names, different homes. Maya reads a date printed on a docket. Daniel has to count four months from letters, and this small model can't do that reliably. Nobody wrote that rule. The evidence did."
+Give it about 20 seconds.
+
+**You should see:** **Public fee or limit** is **On device** for Maya and **Cloud** for Daniel.
+
+**Say:** "Same task, different result. Maya checks a claim against one limit. Daniel works out an executor's fee across three tiers, and this small model gets that math wrong. Nobody wrote that rule. The results did."
 
 ### 2:25 Human in the loop (10s)
 Type this in Maya's box: `Should we accept Brightline's offer?`

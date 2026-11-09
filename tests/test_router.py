@@ -74,7 +74,7 @@ def test_privileged_work_is_simply_produced_on_device(stub):
     for req in prepared.for_user("maya", "summarize_deposition")[:4]:
         stub.answer = passing_answer(req)
         sent = send_prepared(req)
-        assert sent["ask"] is None and sent["label"].startswith(f"ON DEVICE · {llm.LOCAL_MODEL} ·")
+        assert sent["ask"] is None and sent["label"].startswith(f"ON DEVICE · privileged file attached · {llm.LOCAL_MODEL} ·")
         assert "DRAFT" not in sent["label"]
     assert states.current("maya", "summarize_deposition") == "LOCAL"
     assert db.one("SELECT COUNT(*) n FROM evidence")["n"] == 0
@@ -207,7 +207,7 @@ def test_pasted_privileged_email_is_refused_upstream(stub):
     stub.priv = 0.97
     result = router.handle(person("maya"), "Research question: what is the limit? Pasted email: Maya, please keep this between us, the alarm log was deleted.")
     assert result["destination"] == "box"
-    assert result["label"].startswith("KEPT ON DEVICE · privileged 0.97")
+    assert result["label"] == "KEPT ON DEVICE · d1 privileged 0.97"
     assert db.one("SELECT COUNT(*) n FROM cloud_payloads")["n"] == 0
     assert "Refused to send it to the cloud" in db.one("SELECT sentence FROM audit ORDER BY id DESC LIMIT 1")["sentence"]
 
