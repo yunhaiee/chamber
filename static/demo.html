@@ -1,12 +1,12 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Counsel Box</title><link rel="stylesheet" href="/static/style.css"></head>
+<title>Chamber</title><link rel="stylesheet" href="/static/style.css"></head>
 <body><div class="stage">
+  <div class="switch" role="tablist">
+    <button class="on" data-pane="maya" role="tab">Maya Chen</button>
+    <button data-pane="daniel" role="tab">Daniel Osei</button>
+  </div>
   <div class="stage-chat">
-    <div class="switch" role="tablist">
-      <button class="on" data-pane="maya" role="tab">Maya Chen</button>
-      <button data-pane="daniel" role="tab">Daniel Osei</button>
-    </div>
     <iframe id="maya" title="Maya Chen" src="/chat?pane=left"></iframe>
     <iframe id="daniel" title="Daniel Osei" src="/chat?pane=right" hidden></iframe>
   </div>
@@ -17,5 +17,7 @@ document.querySelectorAll('.switch button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.switch button').forEach(x => x.classList.toggle('on', x === b));
   document.getElementById('maya').hidden = b.dataset.pane !== 'maya';
   document.getElementById('daniel').hidden = b.dataset.pane !== 'daniel';
+  const board = document.getElementById('board').contentWindow;
+  if (board.setBoardPerson) board.setBoardPerson(b.dataset.pane);
 });
 </script></body></html>

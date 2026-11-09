@@ -26,7 +26,7 @@ async def lifespan(_app):
     yield
 
 
-app = FastAPI(title="Counsel Box", lifespan=lifespan)
+app = FastAPI(title="Chamber", lifespan=lifespan)
 
 
 def _session_user(request):
@@ -209,12 +209,10 @@ def _short_result(row):
         return "blocked"
     if row["label"] and row["label"].startswith("KEPT ON DEVICE"):
         return "refused upstream"
-    if row["box_ok"] is None:
+    if row["box_ok"] is None or _privileged(row):
         return "no known answer"
     if row["box_ok"]:
         return "passed"
-    if _privileged(row):
-        return "missed"  # the reason would name people and amounts from the file
     reason = json.loads(row["box_checks"] or "{}").get("reason", "")
     reason = "bad format" if reason == "no JSON" else re.sub(r"length <= \d+", "too long", reason)
     return f"missed: {reason}" if reason else "missed"

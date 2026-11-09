@@ -23,7 +23,7 @@ async function signIn(root, pane, done) {
     try { const r = await post('/api/demo-login', { pane }); setToken(r.token); return done(); } catch {}
   }
   const people = await api('/api/people');
-  root.innerHTML = `<form class="signin"><div class="eyebrow">Counsel Box</div>
+  root.innerHTML = `<form class="signin"><div class="eyebrow">Chamber</div>
     <select name="user">${people.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select>
     <input name="pin" type="password" inputmode="numeric" placeholder="PIN" autofocus>
     <button>Sign in</button><div class="fail" id="err"></div></form>`;

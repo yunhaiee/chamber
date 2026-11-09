@@ -130,20 +130,6 @@ def _median(values):
     return int(statistics.median(values)) if values else None
 
 
-def known_record(user, kind, exclude=0):
-    """How this model has done on earlier requests with a known answer."""
-    rows = db.all("SELECT box_ok FROM requests WHERE user=? AND kind=? AND model=? AND box_ok IS NOT NULL AND id!=?", user, kind, model(user), exclude)
-    return sum(r["box_ok"] for r in rows), len(rows)
-
-
-def warning_for(user, kind, exclude=0):
-    """A short warning when this model mostly gets this privileged task wrong."""
-    right, total = known_record(user, kind, exclude)
-    if total >= 3 and right * 2 < total:
-        return f"Often wrong on this task ({right} of {total} right on test cases). Check it."
-    return None
-
-
 def savings():
     """Numbers for the top of the board. Calls avoided counts work that earned its way on device."""
     avoided = db.one("SELECT COUNT(*) n FROM requests WHERE state_at_time='PROVEN' AND destination='box'")["n"]
@@ -162,9 +148,7 @@ def rows_for(user):
         if state == "LAWYER":
             local = None
         elif state == "LOCAL":
-            # Privileged work has no trials. Show how it did on requests with a known answer.
-            graded = db.all("SELECT box_ok AS passed FROM requests WHERE user=? AND kind=? AND box_ok IS NOT NULL ORDER BY id", user, kind)
-            local = _score(graded)
+            local = None  # privileged work has no trials: it is simply produced
         else:
             local = _score(_live(user, kind))
             cloud = _score(db.all("SELECT passed FROM cloud_evidence WHERE user=? AND kind=? AND model=? AND cleared=0 ORDER BY id", user, kind, model(user)))

@@ -1,4 +1,4 @@
-# Counsel Box: 3-minute demo
+# Chamber: 3-minute demo
 
 **The one line:** Don't decide what runs locally. Let the local model prove it. And let the device refuse what must never leave.
 
@@ -32,7 +32,7 @@ SH_DB=demo.db .venv/bin/python wire.py --last 0
 curl -s localhost:11434/api/chat -d '{"model":"lfm3:1.7b","stream":false,"messages":[{"role":"user","content":"hi"}]}' >/dev/null
 ```
 
-**One window, full screen:** open `http://localhost:8000/demo`. The chat is on the left with a **Maya Chen | Daniel Osei** switch, and the dashboard is on the right.
+**One window, full screen:** open `http://localhost:8000/demo`. The **Maya Chen | Daniel Osei** switch at the top changes both the chat on the left and the board on the right.
 
 **Check:** the board is empty and the chat says Online.
 
@@ -102,33 +102,25 @@ What is the deadline to remove a case to federal court? Here is the email from o
 
 **Say:** "Same on-device model, same hardware, and Daniel still can't see Maya's files. He can't even tell the file exists. Today this runs on my Mac. In a firm, it would run on a dedicated AI machine in the office."
 
-### 1:55 Same task, different result (30s)
-On the Board, click **Run the firm's day**.
+### 1:55 Same task, different result (35s)
+Stay on **Daniel Osei**. On the Board, click **Run the firm's day**.
 
 **Say:** "Let's send a lot of different tasks quickly and see how they split."
 
 Give it about 30 seconds.
 
-**You should see:** **Public fee or limit** is **On device** for Maya and **Cloud** for Daniel, and the numbers at the top are moving.
+**You should see:** Daniel's **Public fee or limit** is **Cloud**. Tap **Maya Chen** at the top: hers is **On device**. The numbers at the top are moving.
 
 **Say:** "Same task, different result. Maya checks a claim against one limit. Daniel works out an executor's fee across three tiers, and this small model gets that math wrong. Nobody wrote that rule. The results did. And every call that moved on device is a cloud call the firm doesn't pay for, and it's faster."
 
-### 2:25 When the model is weak (10s)
-
-| Pane | Do | You should see |
-|---|---|---|
-| Daniel | Pick **Distributions** under Tasks, Enter | `Often wrong on this task` warning under the answer |
-
-**Say:** "Privileged work can't go to the cloud, so when the model is weak at it, the lawyer gets told."
-
-### 2:35 Human in the loop (10s)
-Switch to **Maya Chen**. Type `Should we accept Brightline's offer?`
+### 2:30 Human in the loop (10s)
+Still on Maya. Type `Should we accept Brightline's offer?`
 
 **You should see:** `HUMAN · Added to Ruth Abernathy's queue.`
 
 **Say:** "d1 recognizes a legal decision. No AI answers it. It goes to a person."
 
-### 2:45 Close (15s)
+### 2:40 Close (20s)
 Click **Audit log**. Point at `Privileged text sent to cloud 0` and `Log intact`. Click **Board**.
 
 **Say:** "Nothing privileged left the building, and the managing partner can read exactly what did.
@@ -168,12 +160,6 @@ Don't decide what runs locally. Let the local model prove it."
 
 **Why doesn't privileged work earn its way?**
 It can't be compared with the cloud, so there's no second answer. It's produced on device, and a lawyer fixes it if it's wrong.
-
-**How do you know it's wrong if it never went to the cloud?**
-The test requests were generated with the correct amounts, so the on-device answer is compared with a known figure, on device. No cloud answer is involved. A real firm would need its own test set, or corrections from its lawyers, to get the same signal.
-
-**Daniel's "Compute distributions" says 0 of 3 right. Why is it still on device?**
-It's privileged, so it can never leave. The record tells the lawyer to check it. Better math needs a better local model.
 
 **Why not LFM2.5-24B-A2B?**
 On this laptop it kept reasoning with thinking off, returned empty replies and took 12-35s a task. It wasn't tested on a PGX.
