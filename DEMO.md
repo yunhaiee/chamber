@@ -6,7 +6,7 @@
 
 ## Before you go on stage
 
-Run these in three terminals, in order.
+Run these in two terminals, in order. Terminal 3 is optional, for questions about what left the device.
 
 **Terminal 1: the decision model**
 ```bash
@@ -21,7 +21,7 @@ export ANTHROPIC_API_KEY=...      # paste your key here, never into a file
 ./scripts/clean_start.sh 8000
 ```
 
-**Terminal 3: proof of what leaves the device**
+**Terminal 3 (optional): proof of what leaves the device**
 ```bash
 cd ~/dev/onDeviceBuildDay
 SH_DB=demo.db .venv/bin/python wire.py --last 0
@@ -38,7 +38,6 @@ curl -s localhost:11434/api/chat -d '{"model":"lfm3:1.7b","stream":false,"messag
 |---|---|
 | Left, 55% | `http://localhost:8000/demo` (Maya on the left, Daniel on the right) |
 | Right, 45% | `http://localhost:8000/` (the dashboard, on Board) |
-| Behind | Terminal 3 |
 
 **Check:** both boards are empty, and both chats say Online.
 
@@ -61,7 +60,7 @@ So where's the line? You could draw a fixed one. But nobody knows what a small m
 
 So we don't draw the line. Each model has to earn it."
 
-### 0:35 Maya earns it (20s)
+### 0:35 Maya earns it (25s)
 
 | Pane | Do |
 |---|---|
@@ -71,9 +70,9 @@ Correct answers: December 12, 2026, Dept 330 · September 13, 2026, Dept 386 · 
 
 **You should see:** on the Board, Maya's **Public lookup** goes from Testing to **On device**.
 
-**Say:** "Liquid's d1 model reads every request on this device and decides where it can go. This one is public, so both models answer, and the lawyer picks without knowing which is which. After three good answers, the cloud stops being called."
+**Say:** "Liquid's d1 model reads every request on this device and decides where it can go. This one is public, so both models answer, and the lawyer picks without knowing which is which. After three good answers, the cloud stops being called. Each Liquid model earns its own record."
 
-### 0:55 Masking (15s)
+### 1:00 Masking (15s)
 
 | Pane | Do |
 |---|---|
@@ -82,7 +81,7 @@ Correct answers: December 12, 2026, Dept 330 · September 13, 2026, Dept 386 · 
 
 **Say:** "When work goes to the cloud, the client's name doesn't. The key stays here, and we swap the name back here."
 
-### 1:10 Privileged work (20s)
+### 1:15 Privileged work (20s)
 
 **1. A privileged file.** Maya: click **Summarize deposition**. Point at the **Privileged file** tag, then press Enter.
 
@@ -102,18 +101,7 @@ What is the deadline to remove a case to federal court? Here is the email from o
 
 **Say:** "No file here, just a question with a client's email pasted in. d1 catches it, and the router refuses to send it."
 
-### 1:30 History is per model (10s)
-
-| Pane | Do | You should see |
-|---|---|---|
-| Maya | Open the model menu next to the send button. Choose **Liquid · lfm2.5:8b**. | Maya's board empties |
-| Maya | Choose **Liquid · lfm3:1.7b** again. | Her rows return |
-
-**Say:** "Each Liquid model earns its own record, because each can do different things."
-
-**Change it back before going on.**
-
-### 1:40 Hitting the wall (20s)
+### 1:35 Hitting the wall (20s)
 
 | Pane | Do | You should see |
 |---|---|---|
@@ -121,26 +109,34 @@ What is the deadline to remove a case to federal court? Here is the email from o
 
 **Say:** "Same on-device model, same hardware, and Daniel still can't see Maya's files. He can't even tell the file exists. Today this runs on my Mac. In a firm, it would run on a dedicated AI machine in the office."
 
-### 2:00 Same task, different result (25s)
+### 1:55 Same task, different result (25s)
 Press `f` on the dashboard, and press `1` if you aren't on the Board.
 
 **Say:** "Let's send a lot of different tasks quickly and see how they split."
 
 Give it about 20 seconds.
 
-**You should see:** **Public fee or limit** is **On device** for Maya and **Cloud** for Daniel.
+**You should see:** **Public fee or limit** is **On device** for Maya and **Cloud** for Daniel, and the numbers at the top are moving.
 
-**Say:** "Same task, different result. Maya checks a claim against one limit. Daniel works out an executor's fee across three tiers, and this small model gets that math wrong. Nobody wrote that rule. The results did."
+**Say:** "Same task, different result. Maya checks a claim against one limit. Daniel works out an executor's fee across three tiers, and this small model gets that math wrong. Nobody wrote that rule. The results did. And every call that moved on device is a cloud call the firm doesn't pay for, and it's faster."
 
-### 2:25 Human in the loop (10s)
+### 2:20 When the model is weak (10s)
+
+| Pane | Do | You should see |
+|---|---|---|
+| Daniel | Click **Distributions**, Enter | `Often wrong on this task` warning under the answer |
+
+**Say:** "Privileged work can't go to the cloud, so when the model is weak at it, the lawyer gets told."
+
+### 2:30 Human in the loop (10s)
 Type this in Maya's box: `Should we accept Brightline's offer?`
 
 **You should see:** `HUMAN · Added to Ruth Abernathy's queue.`
 
 **Say:** "d1 recognizes a legal decision. No AI answers it. It goes to a person."
 
-### 2:35 Close (25s)
-Press `3` for the audit log. Point at `Privileged text sent to cloud 0` and `Log intact`. Bring Terminal 3 forward for a moment. Press `1` for the Board.
+### 2:40 Close (20s)
+Press `3` for the audit log. Point at `Privileged text sent to cloud 0` and `Log intact`. Press `1` for the Board.
 
 **Say:** "Nothing privileged left the building, and the managing partner can read exactly what did.
 
@@ -158,7 +154,6 @@ Don't decide what runs locally. Let the local model prove it."
 | Both A and B look wrong | Press **Neither**. It goes to the human queue, which is a fine thing to show. |
 | Wi-Fi drops | Say so. On-device work continues, and cloud work shows `Waiting for connection` and runs on reconnect. |
 | Chat shows an error | `curl localhost:9931/health`, then rerun clean start and refresh. |
-| Wrong model is selected | Switch back to `lfm3:1.7b` before pressing `f`. |
 | Daniel's rows still say Testing | Wait a few more seconds. His last trials are still finishing. |
 | Maya's row didn't reach On device | One pick went to the cloud. Say the evidence decided, and move on. |
 
@@ -194,6 +189,9 @@ Actions planned while working on privileged text are logged and never run.
 
 **How does d1 do?**
 On 144 prepared requests it picked the right kind every time, at about 0.4s median. No privileged request scored as public at the 0.30 threshold, and 5 of 24 public questions were held back as false alarms.
+
+**Does each model really keep its own record?**
+Yes. Pick another Liquid model in the menu next to the send button, and that person's board starts empty. Pick the first one again and the rows come back.
 
 **Why does the other model score so badly?**
 Prompts were tuned on `lfm3:1.7b` and not retuned. Treat those numbers as a first look.

@@ -188,6 +188,7 @@ def board(_user=Depends(partner)):
             for u in db.all("SELECT id, name FROM users WHERE role='associate' ORDER BY rowid")
         ],
         "runs": day.status(),
+        "savings": states.savings(),
     }
 
 
@@ -240,6 +241,15 @@ def request_detail(rid: int, _user=Depends(partner)):
         raise HTTPException(404, "Not found")
     box_ran = r["box_in"] is not None
     cloud_ran = r["cloud_in"] is not None
+    d1 = json.loads(r["d1"] or "null")
+    privileged = bool(json.loads(r["hard_rules"] or "[]")) or (d1 is not None and d1["privileged"] >= router.PRIVILEGED_AT)
+    if privileged and not cloud_ran:
+        # The partner sees that it happened and how it did, never the privileged text itself.
+        return {
+            "id": r["id"], "kind": r["kind"], "text": None, "destination": r["destination"], "label": r["label"], "hidden": True,
+            "box": {"received": None, "answer": None, "ms": r["box_ms"], "checks": json.loads(r["box_checks"] or "null"), "ok": r["box_ok"]} if box_ran else None,
+            "cloud": None, "key": None, "d1": d1, "hard_rules": json.loads(r["hard_rules"] or "[]"), "notes": None, "shown": None,
+        }
     return {
         "id": r["id"], "kind": r["kind"], "text": r["text"], "destination": r["destination"], "label": r["label"],
         "box": None if not box_ran else {"received": r["box_in"], "answer": r["box_out"], "ms": r["box_ms"], "checks": json.loads(r["box_checks"] or "null"), "ok": r["box_ok"]},

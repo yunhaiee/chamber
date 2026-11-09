@@ -1,4 +1,5 @@
 """Row states. Each person, kind and local model has one state, always written as a word."""
+import statistics
 import threading
 
 from . import audit, db, llm, prepared
@@ -124,6 +125,32 @@ def _score(rows):
     return {"right": sum(1 for r in rows if r["passed"]), "total": len(rows), "marks": [bool(r["passed"]) for r in rows][-12:]}
 
 
+def _median(values):
+    values = [v for v in values if v]
+    return int(statistics.median(values)) if values else None
+
+
+def known_record(user, kind, exclude=0):
+    """How this model has done on earlier requests with a known answer."""
+    rows = db.all("SELECT box_ok FROM requests WHERE user=? AND kind=? AND model=? AND box_ok IS NOT NULL AND id!=?", user, kind, model(user), exclude)
+    return sum(r["box_ok"] for r in rows), len(rows)
+
+
+def warning_for(user, kind, exclude=0):
+    """A short warning when this model mostly gets this privileged task wrong."""
+    right, total = known_record(user, kind, exclude)
+    if total >= 3 and right * 2 < total:
+        return f"Often wrong on this task ({right} of {total} right on known answers). Check it."
+    return None
+
+
+def savings():
+    """Numbers for the top of the board. Calls avoided counts work that earned its way on device."""
+    avoided = db.one("SELECT COUNT(*) n FROM requests WHERE state_at_time='PROVEN' AND destination='box'")["n"]
+    both = db.all("SELECT box_ms, cloud_ms FROM requests WHERE box_ms IS NOT NULL AND cloud_ms IS NOT NULL")
+    return {"avoided": avoided, "device_ms": _median(r["box_ms"] for r in both), "cloud_ms": _median(r["cloud_ms"] for r in both), "compared": len(both)}
+
+
 def rows_for(user):
     """Board rows for one person, first request first."""
     out = []
@@ -141,7 +168,9 @@ def rows_for(user):
         else:
             local = _score(_live(user, kind))
             cloud = _score(db.all("SELECT passed FROM cloud_evidence WHERE user=? AND kind=? AND model=? AND cleared=0 ORDER BY id", user, kind, model(user)))
+        timing = db.all("SELECT box_ms, cloud_ms FROM requests WHERE user=? AND kind=? AND model=?", user, kind, model(user))
         out.append({
+            "device_ms": _median(r["box_ms"] for r in timing), "cloud_ms": _median(r["cloud_ms"] for r in timing),
             "kind": kind, "label": prepared.label_for(user, kind), "type": TYPE[state], "state": state,
             "local": local, "cloud": cloud, "needed": TRIALS, "model": model(user),
         })

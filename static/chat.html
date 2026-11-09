@@ -125,6 +125,7 @@ function messageHtml(m) {
       ${m.docs.map(d => `<div><span class="attachment"><span class="eyebrowish">Privileged file</span>${esc(d)}</span></div>`).join('')}</div>
     <div>${m.reply && !(m.label || '').startsWith('HUMAN') ? `<div class="reply">${esc(m.reply)}</div>` : ''}
       ${m.label ? `<div class="line dest ${cls}">${esc(m.label)}</div>` : ''}
+      ${m.warning ? `<div class="warn">${esc(m.warning)}</div>` : ''}
       ${m.status === 'working' ? DOTS : ''}
       ${extra ? `<div class="small">${extra}</div>` : ''}
     </div>`;

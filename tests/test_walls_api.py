@@ -64,3 +64,15 @@ def test_long_documents_are_180_to_260_words():
         if "deposition" in doc["title"] or "abstract" in doc["title"]:
             words = len(doc["body"].split())
             assert 180 <= words <= 260, (doc["title"], words)
+
+
+def test_partner_never_sees_privileged_text(client, monkeypatch):
+    from counsel import llm, net
+    monkeypatch.setattr(llm, "local_chat", lambda *a, **k: ('{"answer": "Karen Doyle gave the instruction.", "actions": []}', 5))
+    monkeypatch.setattr(llm, "d1_decide", lambda *a, **k: ({"privileged": {"noul": .9}, "judgment": {"noul": .1}, "kind": {"choice": "summarize_deposition", "confidence": .9}}, 5))
+    maya, ruth = sign_in(client, "maya", "1111"), sign_in(client, "ruth", "3333")
+    doc = db.one("SELECT id FROM documents WHERE title LIKE 'Reyes%'")["id"]
+    sent = client.post("/api/chat", json={"text": "Summarize this.", "doc_ids": [doc]}, headers=maya).json()
+    detail = client.get(f"/api/requests/{sent['id']}", headers=ruth)
+    assert detail.status_code == 200 and detail.json()["hidden"] is True
+    assert "Karen Doyle" not in detail.text and "Summarize this" not in detail.text

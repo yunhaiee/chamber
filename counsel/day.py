@@ -5,8 +5,8 @@ import time
 from . import db, prepared, router
 
 PLAN = {
-    "maya": [("extract_dates", 3), ("privilege_tag", 3), ("public_deadline", 3), ("public_limit", 3), ("public_research", 3), ("draft_letter", 2), ("advice", 1)],
-    "daniel": [("summarize_instrument", 3), ("extract_beneficiaries", 3), ("compute_distribution", 3), ("public_deadline", 3), ("public_limit", 3),
+    "maya": [("public_deadline", 6), ("public_limit", 6), ("extract_dates", 2), ("privilege_tag", 2), ("public_research", 3), ("draft_letter", 2), ("advice", 1)],
+    "daniel": [("public_deadline", 6), ("public_limit", 6), ("compute_distribution", 3), ("summarize_instrument", 2), ("extract_beneficiaries", 2),
                ("public_research", 3), ("draft_client_letter", 2), ("advice", 1)],
 }
 DAY_GAP = 1.5
@@ -51,8 +51,8 @@ def _schedule():
         for user in lanes:
             if lanes[user]:
                 order.append((user, lanes[user].pop(0)))
-    # Tasks both people share go first, so the split between them shows within seconds.
-    return sorted(order, key=lambda job: job[1] not in ("public_deadline", "public_limit"))
+    # Shared tasks and the work that earns a warning go first, so they show within seconds.
+    return sorted(order, key=lambda job: job[1] not in ("public_deadline", "public_limit", "compute_distribution"))
 
 
 def _send(name, user_row, item, source):

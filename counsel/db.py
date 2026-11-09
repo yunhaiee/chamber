@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS requests (
   destination TEXT, state_at_time TEXT, status TEXT, d1 TEXT, hard_rules TEXT,
   box_in TEXT, box_out TEXT, box_ms INTEGER, box_ok INTEGER, box_checks TEXT,
   cloud_in TEXT, cloud_out_tags TEXT, cloud_out TEXT, cloud_ms INTEGER, keymap TEXT,
-  notes TEXT, reply TEXT, label TEXT, shown TEXT, options TEXT, model TEXT, ts REAL);
+  notes TEXT, reply TEXT, label TEXT, shown TEXT, options TEXT, model TEXT, warning TEXT, ts REAL);
 CREATE TABLE IF NOT EXISTS evidence (
   id INTEGER PRIMARY KEY, user TEXT, kind TEXT, model TEXT, passed INTEGER, request_id INTEGER,
   cleared INTEGER DEFAULT 0, ts REAL);

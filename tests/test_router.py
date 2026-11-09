@@ -150,7 +150,22 @@ def test_automatic_day_sends_shared_tasks_first():
     from counsel import day
     order = day._schedule()
     assert len(order) == day.TOTAL_DAY
-    assert {kind for _, kind in order[:12]} == {"public_deadline", "public_limit"}
+    assert {kind for _, kind in order[:27]} == {"public_deadline", "public_limit", "compute_distribution"}
+
+
+def test_weak_privileged_work_gets_a_warning(stub):
+    reqs = prepared.for_user("daniel", "compute_distribution")
+    stub.answer = '{"answer": "nobody gets anything", "actions": []}'
+    results = [send_prepared(r) for r in reqs[:4]]
+    assert results[0]["warning"] is None
+    assert results[3]["warning"].startswith("Often wrong on this task (0 of 3")
+
+
+def test_savings_counts_earned_work_only(stub):
+    db.run("INSERT INTO requests (user, kind, state_at_time, destination, box_ms, cloud_ms, ts) VALUES ('maya','public_deadline','PROVEN','box',500,NULL,0)")
+    db.run("INSERT INTO requests (user, kind, state_at_time, destination, box_ms, cloud_ms, ts) VALUES ('maya','summarize_deposition','LOCAL','box',900,NULL,0)")
+    db.run("INSERT INTO requests (user, kind, state_at_time, destination, box_ms, cloud_ms, ts) VALUES ('maya','public_research','SHADOW','claude',400,2000,0)")
+    assert states.savings() == {"avoided": 1, "device_ms": 400, "cloud_ms": 2000, "compared": 1}
 
 
 def test_one_person_cannot_answer_anothers_pick(stub):

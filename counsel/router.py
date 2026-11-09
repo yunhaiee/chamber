@@ -159,7 +159,8 @@ def _finish_box(rid, user_row, kind, parsed, ms, sentence, refused=False, why=No
         label = f"KEPT ON DEVICE · {why}"
     else:
         label = f"ON DEVICE · {why + ' · ' if why else ''}{model} · {ms / 1000:.1f}s"
-    _update(rid, destination="box", status="done", reply=reply, shown="box", label=label)
+    warning = states.warning_for(user_row["id"], kind, exclude=rid) if why and not refused else None
+    _update(rid, destination="box", status="done", reply=reply, shown="box", label=label, warning=warning)
     # Text in a privileged file or pasted email may try to instruct the model, so its planned actions are captured, never run.
     _record_actions(rid, parsed, executed=not why)
     audit.append(user_row["id"], "request" if not refused else "refused", "blocked" if refused else "box", sentence)
@@ -204,6 +205,7 @@ def view(rid):
         "destination": row["destination"], "status": row["status"], "shown": row["shown"],
         "can_fix": row["shown"] == "box" and row["status"] == "done" and row["state_at_time"] == "PROVEN",
         "ask": "choose" if row["status"] == "choose" else None,
+        "warning": row["warning"],
         "options": ({k: v for k, v in json.loads(row["options"]).items() if k in ("a", "b")} if row["status"] == "choose" and row["options"] else None),
     }
 
