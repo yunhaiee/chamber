@@ -4,13 +4,12 @@ import random
 import re
 import threading
 
-from . import audit, checks, cloud, db, decisions, guards, leak, llm, localq, masking, net, prepared, prompts, states, walls
+from . import accounts, audit, checks, cloud, db, decisions, guards, leak, llm, localq, masking, net, prepared, prompts, states, walls
 
 PRIVILEGED_AT = 0.30
 JUDGMENT_AT = 0.70  # calibrated on the prepared set: advice min 0.70, everything else max 0.67
 KIND_CONFIDENCE_AT = 0.50
 MARKER = re.compile(r"privileged|attorney[- ]client|work product|attorney notes", re.I)
-LAWYER_NAME = "Ruth Abernathy"
 ALLOWED_ACTIONS = {"send_email", "file_document"}
 
 BOX_NOTE = "Handled on device. Nothing left the building."
@@ -74,7 +73,7 @@ def _box(rid, user_id, kind, text, docs, prep, priority, shadow=False, grade=Tru
     """Run the box and grade it if this request has an answer key. Returns (parsed, ms, ok) or None on infra error."""
     system, user_text = prompts.build(kind, text, docs)
     try:
-        model = states.model(user_id)
+        model = states.local_model(user_id)
         raw, ms = localq.run(lambda: llm.local_chat(system, user_text, model=model, num_predict=prompts.max_tokens(kind)), priority)
     except llm.LocalError as e:
         # A failed shadow must not overwrite the answer Claude gave the person.
@@ -165,9 +164,12 @@ def _finish_box(rid, user_row, kind, parsed, ms, sentence, refused=False, why=No
 
 
 def _queue_for_lawyer(rid, user_row, kind, text, title, reason):
-    db.run("INSERT INTO queue (request_id, assignee, reason, ts) VALUES (?,?,?,?)", rid, "ruth", reason, db.now())
-    _update(rid, destination="lawyer", status="queued", reply=f"Added to {LAWYER_NAME}'s queue.", label=f"HUMAN · Added to {LAWYER_NAME}'s queue.")
-    audit.append(user_row["id"], "request", "lawyer", f"{_ask_text(user_row['name'], kind, title, text)} Sent to {LAWYER_NAME}'s queue. No AI answered.")
+    boss = accounts.supervisor(user_row)
+    db.run("INSERT INTO queue (request_id, assignee, reason, ts) VALUES (?,?,?,?)", rid, boss["id"] if boss else user_row["id"], reason, db.now())
+    reply = f"Added to {boss['name']}'s queue." if boss else "This needs your own judgment. No AI answered."
+    _update(rid, destination="lawyer", status="queued", reply=reply, label=f"HUMAN · {reply}")
+    where = f"Sent to {boss['name']}'s queue." if boss else "Left for them to decide."
+    audit.append(user_row["id"], "request", "lawyer", f"{_ask_text(user_row['name'], kind, title, text)} {where} No AI answered.")
 
 
 def hard_rules(text, has_docs, d1):
@@ -219,9 +221,14 @@ def handle(user_row, text, doc_ids=(), source="chat"):
 
     # 1. A privacy rule never leaves the box.
     if source == "chat" and masking.is_privacy_rule(text):
-        reply = masking.apply_rule(user_id, text)
+        if user_row["role"] in accounts.MANAGING:
+            reply = masking.apply_rule(user_id, text)
+            sentence = f"{user_row['name']} changed the masking list. {BOX_NOTE}"
+        else:  # the firm's masking binds everyone, so it can't be changed from an employee's chat
+            reply = "Masking is set by your firm's managers. Nothing changed."
+            sentence = f"{user_row['name']} asked to change the masking list. Nothing changed. {BOX_NOTE}"
         _update(rid, kind="privacy_rule", destination="box", status="done", reply=reply, label="ON DEVICE")
-        audit.append(user_id, "mask.rule", "box", f"{user_row['name']} changed the masking list. {BOX_NOTE}")
+        audit.append(user_id, "mask.rule", "box", sentence)
         return view(rid)
 
     def refuse_as_missing(title):
@@ -260,8 +267,7 @@ def handle(user_row, text, doc_ids=(), source="chat"):
     title = docs[0]["title"] if docs else None
 
     # 3. Ask d1.
-    kinds = prepared.KINDS_BY_USER.get(user_id, [])
-    d1 = decisions.ask(kinds, text, bodies) if kinds else None
+    d1 = decisions.ask(prepared.kinds_for(user_id), text, bodies)
 
     # 4. Hard rules d1 can't overrule.
     hard = hard_rules(text, bool(bodies), d1)
@@ -340,8 +346,9 @@ def handle(user_row, text, doc_ids=(), source="chat"):
         _offer_choice(rid, user_id, kind, box_result.get("r"))
         return view(rid)
 
-    # Claude answers. The box runs too and is checked, not shown.
-    threading.Thread(target=_shadow, args=(rid, user_id, kind, text, bodies, prep, priority, not (human and state == "SHADOW")), daemon=True).start()
+    # Claude answers. The box runs too and is checked, not shown, unless the person chose the cloud outright.
+    if not llm.is_cloud(states.model(user_id)):
+        threading.Thread(target=_shadow, args=(rid, user_id, kind, text, bodies, prep, priority, not (human and state == "SHADOW")), daemon=True).start()
     if not net.online():
         _update(rid, destination="claude", status="waiting", label="Waiting for connection", reply=None)
         return view(rid)
@@ -355,6 +362,12 @@ def _salvage(raw):
     text = match.group(1) if match else (raw or "")
     text = re.split(r'"\s*[,}]', text, maxsplit=1)[0]
     return text.replace("\\n", "\n").replace('\\"', '"').strip()[:1200]
+
+
+def plain(raw):
+    """A model's raw reply as the text a person reads."""
+    parsed = llm.first_json(raw)
+    return render(parsed["answer"]) if isinstance(parsed, dict) and "answer" in parsed else _salvage(raw)
 
 
 def _offer_choice(rid, user_id, kind, box_result):

@@ -2,8 +2,6 @@
 
 One on-device AI shared by a law firm. Each model earns the work it can do, and privileged text never leaves.
 
-[한국어](README.ko.md)
-
 Built for the AGI House *Personal Agent to Real-World Deployment* Build Day, November 2026.
 
 ## The problem
@@ -22,7 +20,10 @@ Chamber doesn't draw the line. Each model earns it, per person, per task, per mo
 | Cloud | Names are masked first. The key stays on device and names are restored locally. |
 | Legal decisions | These go to a human. No AI answers them. |
 | Walls | Lawyers share one model but can't see each other's matters. The server enforces this. |
-| Audit | A hash-chained log tells the managing partner in plain sentences what happened. |
+| Audit | A hash-chained log records in plain sentences what happened. |
+| People | The head of firm adds managers and employees. A manager oversees only the people under them, and a legal decision goes to the asker's own manager. |
+| Firm masking | Managers keep one list of names and private details, typed in or uploaded as a `.txt` or `.csv`. It's applied to everyone's cloud text, and employees can't change it. |
+| Models | LFM3 is the default. Any other chat model installed in Ollama appears in the menu next to the send button and earns its own record. Prompts are tuned for LFM3, so others may score lower. With a key set, the cloud model is in the same menu: public work then goes straight to it, masked. Privileged work still stays on device. |
 
 **Same task, different result.** Two lawyers ran "Public fee or limit." Checking a claim against one limit moved on device. An executor's fee across three tiers stayed in the cloud, because LFM3 got the math wrong. Nobody wrote that rule.
 
@@ -55,17 +56,22 @@ llama serve -hf LiquidAI/d1-2B-GGUF:Q8_0 -b 8192 -ub 8192 --port 9931
 Start the app in another:
 
 ```bash
-export ANTHROPIC_API_KEY=...      # never put this in a file
-./scripts/clean_start.sh 8000
+security add-generic-password -a chamber -s chamber-anthropic-key -U -w      # once: paste your key at the prompt
+./scripts/start.sh 8000
 ```
 
-`clean_start.sh` deletes the demo database before it starts. Without a key, the cloud is replaced by a local `qwen3:8b` stand-in, which needs `ollama pull qwen3:8b`.
+The key lives in the macOS Keychain and the start scripts read it from there, so it's never in a file. `ANTHROPIC_API_KEY` overrides it if set.
+
+Open `http://localhost:8000` on that machine and create the firm. Everything is kept in `chamber.db` on the device, so it's still there after a restart. Without a key, the cloud is replaced by a local `qwen3:8b` stand-in, which needs `ollama pull qwen3:8b`.
+
+The app only listens on this machine by default. To let others in the office reach it, set `CHAMBER_HOST=0.0.0.0` and put HTTPS in front of it.
 
 | Page | What it is |
 |---|---|
-| `http://localhost:8000/demo` | One window: chat, a Maya / Daniel switch, the firm's board, and Reset at the top right |
-| `http://localhost:8000/chat` | Chat for one lawyer |
-| `http://localhost:8000/` | The managing partner's dashboard |
+| `http://localhost:8000/` | Sign in and chat |
+| `http://localhost:8000/manage` | Board, Requests, Masking and People, for the head of firm and managers |
+
+To run the fictional firm instead, use `./scripts/clean_start.sh 8000` and open `http://localhost:8000/demo`. That script deletes `demo.db` before it starts and never touches `chamber.db`.
 
 `DEMO.md` has the 3-minute demo script. Run the tests with `.venv/bin/python -m pytest`.
 
@@ -75,12 +81,13 @@ Python, FastAPI, SQLite, Ollama, llama.cpp, Liquid LFM3-1.7B, Liquid d1-2B, Clau
 
 ## Scope
 
-- The firm, matters and documents are synthetic.
+- The demo's firm, matters and documents are synthetic.
 - It has run on a Mac laptop, not yet on dedicated AI hardware.
 - Three trials is a demo bar. A real firm would need far more.
 - The leak test catches exact client names, secrets, emails and runs of 8 words from a document, so a paraphrase would get past it. d1 can misjudge, which is why fixed rules back it up.
 - The attack cases are our own, so they are a test and not a guarantee.
-- File upload and real sign-in aren't built. Files are picked from the seeded set, and the PINs in `seed/users.json` are demo values.
+- Adding matters and uploading client documents aren't built yet, so a real firm's chat has no files to attach. The PINs in `seed/users.json` are demo values.
+- People can't reset or change their own password yet. The password is the one their manager set.
 - Some California citations in the prepared tasks haven't been checked against the official code.
 - This isn't legal advice, and it doesn't replace a firm's ethics obligations.
 

@@ -2,6 +2,8 @@
 
 The key (tag to value) stays on the box. Detection failure blocks the cloud call.
 """
+import csv
+import io
 import json
 import re
 
@@ -87,6 +89,89 @@ GROUP_PATTERNS = {
 CARD = re.compile(r"(?<![\d-])\d(?:[ -]?\d){12,18}(?!\d)")
 
 
+MAX_TERM = 200
+MAX_TERMS = 20000
+MAX_FILE_CHARS = 2_000_000
+HEADER_WORDS = {"name", "names", "full name", "first name", "last name", "email", "e-mail", "phone", "address", "ssn", "client", "party", "id", "notes"}
+PERSON = re.compile(r"^[^\W\d_][\w.'’-]*(?: [^\W\d_][\w.'’-]*){0,3}$")
+_firm_cache = (None, None)
+
+
+def _normal(term):
+    return " ".join(str(term).split())
+
+
+def _kind(term):
+    if PATTERNS["email"].fullmatch(term):
+        return "email"
+    if PATTERNS["phone"].fullmatch(term):
+        return "phone"
+    if PERSON.match(term) and term[0].isupper():
+        return "people_full"
+    return "term"
+
+
+def _usable(term):
+    """A one-letter or short numeric entry would mask ordinary words and numbers everywhere."""
+    return 2 <= len(term) <= MAX_TERM and not (term.isdigit() and len(term) < 5)
+
+
+def _firm_matcher():
+    """One compiled pattern for the firm's list, rebuilt only when the list changes."""
+    global _firm_cache
+    stamp = db.one("SELECT COUNT(*) n, MAX(id) top FROM mask_terms")
+    stamp = (db.path(), stamp["n"], stamp["top"])
+    if _firm_cache[0] == stamp:
+        return _firm_cache[1]
+    rows = db.all("SELECT term, kind FROM mask_terms")
+    matcher = None
+    if rows:
+        kinds = {r["term"].lower(): r["kind"] for r in rows}
+        alternatives = "|".join(re.escape(t).replace(r"\ ", r"\s+") for t in sorted(kinds, key=len, reverse=True))
+        matcher = (re.compile(rf"(?<!\w)(?:{alternatives})(?!\w)", re.I), kinds)
+    _firm_cache = (stamp, matcher)
+    return matcher
+
+
+def parse_terms(filename, text):
+    """Entries from an uploaded .txt (one per line) or .csv (every cell, header row skipped)."""
+    name = filename.lower()
+    if not name.endswith((".txt", ".csv")):
+        raise ValueError("Upload a .txt or .csv file.")
+    if len(text) > MAX_FILE_CHARS:
+        raise ValueError("That file is too large.")
+    if name.endswith(".txt"):
+        return [_normal(line) for line in text.splitlines() if line.strip()]
+    rows = [[_normal(cell) for cell in row if cell.strip()] for row in csv.reader(io.StringIO(text))]
+    rows = [row for row in rows if row]
+    if rows and any(cell.lower() in HEADER_WORDS for cell in rows[0]) and not any("@" in c or any(ch.isdigit() for ch in c) for c in rows[0]):
+        rows = rows[1:]
+    return [cell for row in rows for cell in row]
+
+
+def add_terms(user_id, values, source):
+    """Add entries to the firm's list. Returns how many were added, already there, and skipped."""
+    cleaned = [_normal(v) for v in values]
+    usable = list({v.lower(): v for v in cleaned if _usable(v)}.values())
+    have = db.one("SELECT COUNT(*) n FROM mask_terms")["n"]
+    if have + len(usable) > MAX_TERMS:
+        raise ValueError(f"The firm's list holds up to {MAX_TERMS:,} entries.")
+    connection = db.conn()
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        added = 0
+        for term in usable:
+            added += connection.execute(
+                "INSERT OR IGNORE INTO mask_terms (term, kind, source, added_by, ts) VALUES (?,?,?,?,?)",
+                (term, _kind(term), source, user_id, db.now()),
+            ).rowcount
+        connection.execute("COMMIT")
+    except Exception:
+        connection.execute("ROLLBACK")
+        raise
+    return {"added": added, "existing": len(usable) - added, "skipped": len(cleaned) - len(usable)}
+
+
 def _spans(text, items, find_people):
     spans = []
 
@@ -113,6 +198,12 @@ def _spans(text, items, find_people):
         for name in party_names():
             for m in re.finditer(rf"(?<![\w]){re.escape(name)}(?![\w])", text):
                 add(m.start(), m.end(), "client")
+
+    matcher = _firm_matcher()
+    if matcher:
+        pattern, kinds = matcher
+        for m in pattern.finditer(text):
+            add(m.start(), m.end(), kinds.get(_normal(m.group()).lower(), "term"))
 
     for item in items:
         if item["grp"] != "added" or not item["enabled"]:

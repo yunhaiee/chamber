@@ -357,9 +357,9 @@ def test_offline_public_work_waits_then_runs(stub, monkeypatch):
 
 
 def test_privacy_rule_never_reaches_the_cloud_and_adds_item(stub):
-    result = router.handle(person("maya"), "Don't send people's names to the cloud.")
+    result = router.handle(person("ruth"), "Don't send people's names to the cloud.")
     assert result["reply"] == "Added to masking: people's full names."
-    assert db.one("SELECT label, added_by FROM mask_items WHERE grp='added'") == {"label": "people's full names", "added_by": "maya"}
+    assert db.one("SELECT label, added_by FROM mask_items WHERE grp='added'") == {"label": "people's full names", "added_by": "ruth"}
     assert not [p for p in stub.prompts if p[0] == "cloud"]
 
 
@@ -370,3 +370,23 @@ def test_audit_edit_is_detected(stub):
     first = db.one("SELECT id FROM audit ORDER BY id LIMIT 1")["id"]
     db.run("UPDATE audit SET sentence='nothing happened' WHERE id=?", first)
     assert audit.verify() == {"intact": False, "first_bad": first}
+
+
+def test_choosing_the_cloud_sends_public_work_straight_there(stub):
+    states.set_model("maya", llm.CLOUD_MODEL)
+    result = router.handle(person("maya"), "What is the time limit for fraud?")
+    join_shadows()
+    assert result["destination"] == "claude" and result["status"] == "done"
+    assert not [p for p in stub.prompts if p[0] == "local"]
+    assert states.rows_for("maya")[0]["type"] == "Cloud"
+
+
+def test_choosing_the_cloud_never_sends_privileged_text_there(stub):
+    states.set_model("maya", llm.CLOUD_MODEL)
+    stub.priv = 0.97
+    result = router.handle(person("maya"), "What is the limit? Pasted email: please keep this between us, the alarm log was deleted.")
+    join_shadows()
+    assert result["destination"] == "box"
+    assert db.one("SELECT COUNT(*) n FROM cloud_payloads")["n"] == 0
+    assert not [p for p in stub.prompts if p[0] == "cloud"]
+    assert db.one("SELECT model FROM requests ORDER BY id DESC LIMIT 1")["model"] == llm.LOCAL_MODEL

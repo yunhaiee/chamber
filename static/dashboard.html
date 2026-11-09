@@ -1,19 +1,21 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Chamber</title><link rel="stylesheet" href="/static/style.css"></head>
+<title>Chamber</title><link rel="icon" href="/static/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="/static/style.css"></head>
 <body><div id="root"></div>
 <script src="/static/common.js"></script>
 <script>
 const root = document.getElementById('root');
-const TABS = [['board', 'Board'], ['requests', 'Requests'], ['queue', 'Human queue'], ['audit', 'Audit log'], ['masking', 'Masking']];
+const EMBEDDED = new URLSearchParams(location.search).get('pane') === 'partner';
+const TABS = [['board', 'Board'], ['requests', 'Requests'], ['masking', 'Masking'], ...(EMBEDDED ? [] : [['people', 'People']])];
+const ROLE_WORD = { head: 'Head of firm', manager: 'Manager', employee: 'Employee' };
 const DEST_WORD = { box: 'On device', claude: 'Cloud', lawyer: 'Human', blocked: 'Blocked' };
 const TYPE_CLASS = { Testing: 'testing', 'On device': 'box', Cloud: 'claude', Human: 'lawyer' };
-const EMBEDDED = new URLSearchParams(location.search).get('pane') === 'partner';
-const ui = { boardPerson: 'maya', tab: 'board', expanded: new Set(), types: null, selected: null, pinned: false, person: '', auditUser: '', auditDest: '', payload: null, seenMask: null, last: {} };
+const ui = { people: [], boardPerson: null, tab: 'board', expanded: new Set(), types: null, selected: null, pinned: false, person: '', seenMask: null, last: {} };
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function shell() {
-  root.innerHTML = `<div class="top"><strong>Chamber</strong><span id="tabs"></span><span class="status" id="status"></span></div><main id="main"></main>`;
+  root.innerHTML = `<div class="top">${BRAND}<span id="tabs"></span>${EMBEDDED ? '' : '<nav class="topnav"><a href="/">Chat</a><button type="button" id="signout">Sign out</button></nav>'}</div><main id="main"></main>`;
+  document.getElementById('signout')?.addEventListener('click', signOut);
   renderTabs();
 }
 function renderTabs() {
@@ -45,9 +47,11 @@ function renderBoard(data) {
   const main = document.getElementById('main');
   const known = ui.types;
   ui.types = new Map();
+  ui.people = data.people;
+  if (!data.people.some(p => p.user === ui.boardPerson)) ui.boardPerson = data.people[0]?.user;
   const sv = data.savings;
   const secs = ms => ms ? `${(ms / 1000).toFixed(1)}s` : '-';
-  main.innerHTML = `<div class="stats"><div><b>${sv.avoided}</b><span>cloud calls avoided</span></div><div><b>${secs(sv.device_ms)}</b><span>on device</span></div><div><b>${secs(sv.cloud_ms)}</b><span>cloud</span></div><button class="runday" id="runday">${data.runs.day.running ? 'Running…' : 'Run the firm\'s day'}</button></div>` + (EMBEDDED ? '' : `<div><div class="switch" style="background:var(--bg-2)">${data.people.map(p => `<button class="${p.user === ui.boardPerson ? 'on' : ''}" data-person="${p.user}">${esc(p.name)}</button>`).join('')}</div></div>`) + data.people.filter(p => p.user === ui.boardPerson).map(p => `<section class="band"><div class="bandhead">${esc(p.name)}<span class="muted">${esc(p.model)}</span></div>
+  main.innerHTML = `<div class="stats"><div><b>${sv.avoided}</b><span>cloud calls avoided</span></div><div><b>${secs(sv.device_ms)}</b><span>on device</span></div><div><b>${secs(sv.cloud_ms)}</b><span>cloud</span></div>${data.demo ? `<button class="runday" id="runday">${data.runs.day.running ? 'Running…' : 'Run the firm\'s day'}</button>` : ''}</div>` + (EMBEDDED ? '' : `<div><div class="switch">${data.people.map(p => `<button class="${p.user === ui.boardPerson ? 'on' : ''}" data-person="${p.user}">${esc(p.name)}</button>`).join('')}</div></div>`) + data.people.filter(p => p.user === ui.boardPerson).map(p => `<section class="band"><div class="bandhead">${esc(p.name)}<span class="muted">${esc(p.model)}</span></div>
     <table class="board"><tr class="eyebrow"><th>Task</th><th>Type</th></tr>
     ${p.rows.map(r => {
       const id = `${p.user}/${r.kind}`;
@@ -59,9 +63,9 @@ function renderBoard(data) {
         : `<span class="state ${TYPE_CLASS[r.type]}">${r.type}</span>`;
       return `<tr class="pick ${fresh ? 'flash' : ''}" data-row="${id}"><td>${open ? '▾' : '▸'} ${esc(r.label)}</td><td>${typeCell}</td></tr>
         ${open ? `<tr><td colspan="2" class="muted">${expandedHtml(r)}</td></tr>` : ''}`;
-    }).join('')}</table></section>`).join('');
+    }).join('')}</table>${p.rows.length ? '' : '<div class="muted empty-note">No work yet.</div>'}</section>`).join('');
   main.querySelectorAll('[data-person]').forEach(b => b.onclick = () => window.setBoardPerson(b.dataset.person));
-  document.getElementById('runday').onclick = () => post('/api/day/start');
+  document.getElementById('runday')?.addEventListener('click', () => post('/api/day/start'));
   main.querySelectorAll('[data-row]').forEach(el => el.onclick = () => {
     const id = el.dataset.row;
     ui.expanded.has(id) ? ui.expanded.delete(id) : ui.expanded.add(id);
@@ -72,77 +76,115 @@ function renderBoard(data) {
 
 function destHtml(d) { return d ? `<span class="dest ${d}">${DEST_WORD[d] || d}</span>` : ''; }
 
-function columnHtml(title, side, data, kind) {
-  if (!side) {
-    const d1 = data.d1 ? `priv ${data.d1.privileged.toFixed(2)} · judg ${data.d1.judgment.toFixed(2)}` : 'd1 unavailable';
-    const rules = data.hard_rules.length ? ` · ${data.hard_rules.join(', ')}` : '';
-    return `<div><h3>${title}</h3><div class="muted">Not sent</div><div class="small">${esc(d1 + rules)}</div></div>`;
-  }
+function columnHtml(title, side, kind) {
+  if (!side) return `<div><h3>${title}</h3><div class="muted">Not sent</div></div>`;
   return `<div><h3>${title}</h3><div class="eyebrow">Received</div><div class="mono">${tagged(side.received)}</div>
-    <div class="eyebrow">Answer</div><div class="mono">${tagged(kind === 'cloud' ? side.answer_with_tags : side.answer)}</div>
-    <div class="small">${((side.ms || 0) / 1000).toFixed(1)}s${side.checks ? ' · ' + side.checks.items.map(i => `${i.ok ? '' : 'failed '}${esc(i.name)}`).join(', ') : ''}</div></div>`;
+    <div class="eyebrow">Answer</div><div class="mono">${tagged(kind === 'cloud' ? side.answer_with_tags : side.answer)}</div></div>`;
 }
 
 async function renderDetail(id) {
   const holder = document.getElementById('detail');
   if (!holder || !id) { if (holder) holder.innerHTML = ''; return; }
   const data = await api(`/api/requests/${id}`);
-  const scores = data.d1 ? `d1: privileged ${data.d1.privileged.toFixed(2)} · needs a human ${data.d1.judgment.toFixed(2)}` : '';
   if (data.hidden) {
-    const b = data.box;
-    holder.innerHTML = `<div class="small">${scores}</div><div class="detail"><div><h3>On device</h3><div class="muted">Privileged text is hidden from this view.</div><div class="small">${b ? ((b.ms || 0) / 1000).toFixed(1) + 's' : ''}${b && b.checks ? ' · ' + b.checks.items.map(i => `${i.ok ? '' : 'missed '}${esc(i.name)}`).join(', ') : ''}</div></div><div><h3>Cloud</h3><div class="muted">Not sent</div></div></div>`;
+    holder.innerHTML = `<div class="detail"><div><h3>On device</h3><div class="muted">Privileged text is hidden from this view.</div></div><div><h3>Cloud</h3><div class="muted">Not sent</div></div></div>`;
     return;
   }
   const key = data.key && Object.keys(data.key).length ? Object.entries(data.key).map(([t, v]) => `<div><span class="tag">${esc(t)}</span> ${esc(v)}</div>`).join('') : '<div class="muted">None</div>';
   const cloudExtra = data.cloud ? `<div class="eyebrow">Key</div><div>${key}</div><div class="eyebrow" style="margin-top:10px">Shown to the person</div><div class="mono">${esc(data.cloud.answer)}</div>` : '';
-  holder.innerHTML = `<div class="small">${scores}</div><div class="detail">${columnHtml('On device', data.box, data, 'box')}<div>${columnHtml('Cloud', data.cloud, data, 'cloud')}${cloudExtra}</div></div>`;
+  holder.innerHTML = `<div class="detail">${columnHtml('On device', data.box, 'box')}<div>${columnHtml('Cloud', data.cloud, 'cloud')}${cloudExtra}</div></div>`;
 }
 
 function renderRequests(data) {
   const main = document.getElementById('main');
   if (!document.getElementById('reqs')) {
-    main.innerHTML = `<div class="filters"><span class="eyebrow">Person</span><select id="person"><option value="">All</option><option value="maya">Maya Chen</option><option value="daniel">Daniel Osei</option></select></div><div id="reqs"></div><div id="detail"></div>`;
+    main.innerHTML = `<div class="filters"><span class="eyebrow">Person</span><select id="person"><option value="">All</option>${ui.people.map(p => `<option value="${esc(p.user)}">${esc(p.name)}</option>`).join('')}</select></div><div id="reqs"></div><div id="detail"></div>`;
     document.getElementById('person').onchange = ev => { ui.person = ev.target.value; ui.last = {}; tick(); };
   }
   document.getElementById('person').value = ui.person;
-  document.getElementById('reqs').innerHTML = `<table><tr><th>Task</th><th>Who</th><th>Where</th><th>On-device check</th></tr>
-    ${data.requests.filter(r => r.status !== 'working').slice(0, 30).map(r => `<tr class="pick ${r.id === ui.selected ? 'chosen' : ''}" data-id="${r.id}"><td>${esc(r.label)}</td><td>${esc(r.name.split(' ')[0])}</td><td>${destHtml(r.destination)}</td>
-      <td class="${r.result === 'blocked' ? 'fail' : ''}">${r.result === 'no known answer' ? '' : esc(r.result)}</td></tr>`).join('')}</table>`;
+  document.getElementById('reqs').innerHTML = `<table><tr><th>Task</th><th>Who</th><th>Where</th></tr>
+    ${data.requests.filter(r => r.status !== 'working').slice(0, 30).map(r => `<tr class="pick ${r.id === ui.selected ? 'chosen' : ''}" data-id="${r.id}"><td>${esc(r.label)}</td><td>${esc(r.name.split(' ')[0])}</td><td>${destHtml(r.destination)}</td></tr>`).join('')}</table>`;
   document.querySelectorAll('tr.pick').forEach(tr => tr.onclick = () => { ui.selected = Number(tr.dataset.id); ui.pinned = true; ui.last.detail = null; tick(); });
   if (!ui.pinned && data.latest_chat && data.latest_chat !== ui.selected && data.latest_chat !== ui.closedAt) ui.selected = data.latest_chat;
 }
 
-function renderQueue(items) {
-  document.getElementById('main').innerHTML = items.length
-    ? `<table><tr class="eyebrow"><th>Task</th><th>Who</th><th>When</th><th>Why</th></tr>${items.map(q => `<tr><td>${esc(q.label || q.kind)}</td><td>${esc(q.name)}</td><td>${clock(q.ts)}</td><td>${esc(q.reason)}</td></tr>`).join('')}</table>`
-    : '<div class="muted">Empty</div>';
+// Each person sits under whoever they report to.
+function byHierarchy(people) {
+  const ids = new Set(people.map(p => p.id));
+  const out = [];
+  const walk = (p, depth) => { out.push({ ...p, depth }); people.filter(x => x.reports_to === p.id).forEach(x => walk(x, depth + 1)); };
+  people.filter(p => !ids.has(p.reports_to)).forEach(p => walk(p, 0));
+  return out;
 }
 
-function renderAudit(data) {
+function armRemove(button, action) {
+  button.onclick = async () => {
+    if (button.dataset.armed) { await action(); ui.last = {}; tick(); return; }
+    button.dataset.armed = '1'; button.textContent = 'Confirm';
+    setTimeout(() => { delete button.dataset.armed; button.textContent = 'Remove'; }, 4000);
+  };
+}
+
+function renderPeople(t) {
   const main = document.getElementById('main');
-  if (!document.getElementById('entries')) {
-    main.innerHTML = `<div class="totals" id="totals"></div><div class="filters"><span class="eyebrow">Person</span>
-      <select id="auser"><option value="">All</option><option value="maya">Maya Chen</option><option value="daniel">Daniel Osei</option></select>
-      <span class="eyebrow">Destination</span><select id="adest"><option value="">All</option>${Object.entries(DEST_WORD).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
-      <button id="csv" class="muted">Export</button><span id="intact"></span></div><div id="payload"></div><div id="entries"></div>`;
-    document.getElementById('auser').onchange = ev => { ui.auditUser = ev.target.value; ui.last = {}; tick(); };
-    document.getElementById('adest').onchange = ev => { ui.auditDest = ev.target.value; ui.last = {}; tick(); };
-    document.getElementById('csv').onclick = async () => {
-      const blob = new Blob([await api('/api/audit.csv')], { type: 'text/csv' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'audit.csv'; a.click();
+  if (!document.getElementById('peoplelist')) {
+    main.innerHTML = `<form class="personform" id="personform" autocomplete="off">
+      <input name="name" placeholder="Full name" aria-label="Full name" required>
+      <input name="email" type="email" placeholder="Work email" aria-label="Work email" required>
+      <input name="title" placeholder="Job title" aria-label="Job title">
+      <input name="password" type="password" placeholder="Temporary password" aria-label="Temporary password" required minlength="8" autocomplete="new-password">
+      <select name="role" id="newrole" aria-label="Role" hidden><option value="employee">Employee</option><option value="manager">Manager</option></select>
+      <select name="reports_to" id="newboss" aria-label="Reports to" hidden></select>
+      <button>Add person</button></form><div class="small" id="personreply" role="status"></div><div id="peoplelist"></div>`;
+    document.getElementById('personform').onsubmit = async ev => {
+      ev.preventDefault();
+      const reply = document.getElementById('personreply');
+      try {
+        await post('/api/team', Object.fromEntries(new FormData(ev.target)));
+        reply.textContent = `Added ${ev.target.elements.name.value}.`;
+        ev.target.reset();
+        ui.last = {}; tick();
+      } catch (e) { reply.textContent = e.detail || 'Could not add that person.'; }
     };
   }
-  const t = data.totals;
-  document.getElementById('totals').innerHTML = `Requests ${t.requests} · On device ${t.box} · Cloud ${t.claude} · Human ${t.lawyer} · Blocked ${t.blocked} · <span class="${t.privileged_sent ? 'fail' : ''}">Privileged text sent to cloud ${t.privileged_sent}</span>`;
-  document.getElementById('intact').innerHTML = data.intact ? 'Log intact' : `<span class="fail">Entry ${data.first_bad} fails verification</span>`;
-  document.getElementById('entries').innerHTML = data.entries.map(e => `<div class="entry"><time>${clock(e.ts)}</time><div>${esc(e.sentence)}${e.payload_id ? ` <button class="muted" style="text-decoration:underline" data-p="${e.payload_id}">What was sent</button>` : ''}</div></div>`).join('');
-  document.querySelectorAll('[data-p]').forEach(b => b.onclick = async () => {
-    const p = await api(`/api/payload/${b.dataset.p}`);
-    document.getElementById('payload').innerHTML = `<div class="detail" style="grid-template-columns:1fr"><div><div class="eyebrow">What was sent</div><div class="mono">${tagged(p.user_text)}</div></div></div>`;
+  const role = document.getElementById('newrole'), boss = document.getElementById('newboss');
+  role.hidden = boss.hidden = !t.is_head;
+  const picked = boss.value;
+  boss.innerHTML = t.managers.map(m => `<option value="${esc(m.id)}">Reports to ${esc(m.name)}</option>`).join('');
+  if (picked && t.managers.some(m => m.id === picked)) boss.value = picked; else boss.value = t.you;
+  const row = p => {
+    const editable = t.is_head && p.role !== 'head';
+    const roleCell = editable ? `<select data-edit="${esc(p.id)}" data-field="role" aria-label="Role"><option value="employee" ${p.role === 'employee' ? 'selected' : ''}>Employee</option><option value="manager" ${p.role === 'manager' ? 'selected' : ''}>Manager</option></select>` : ROLE_WORD[p.role];
+    const bossCell = editable ? `<select data-edit="${esc(p.id)}" data-field="reports_to" aria-label="Reports to">${t.managers.filter(m => m.id !== p.id).map(m => `<option value="${esc(m.id)}" ${m.id === p.reports_to ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select>` : esc(p.reports_name);
+    const canRemove = p.role !== 'head' && p.id !== t.you;
+    return `<tr><td style="padding-left:${p.depth * 22}px"><div>${esc(p.name)}</div><div class="small">${esc(p.email || '')}</div></td><td>${esc(p.title || '')}</td><td>${roleCell}</td><td>${bossCell}</td><td class="right">${canRemove ? `<button class="remove" data-remove="${esc(p.id)}">Remove</button>` : ''}</td></tr>`;
+  };
+  document.getElementById('peoplelist').innerHTML = `<table class="people"><tr><th>Name</th><th>Title</th><th>Role</th><th>Reports to</th><th></th></tr>${byHierarchy(t.people).map(row).join('')}</table>`;
+  document.querySelectorAll('[data-edit]').forEach(s => s.onchange = async () => {
+    const reply = document.getElementById('personreply');
+    try { await post(`/api/team/${s.dataset.edit}`, { [s.dataset.field]: s.value }); reply.textContent = 'Saved.'; }
+    catch (e) { reply.textContent = e.detail || 'Could not save that.'; }
+    ui.last = {}; tick();
   });
+  document.querySelectorAll('[data-remove]').forEach(b => armRemove(b, () => post(`/api/team/${b.dataset.remove}/remove`)));
 }
 
-function renderMasking(items) {
+function termReply(r) {
+  const parts = [`Added ${r.added}`];
+  if (r.existing) parts.push(`${r.existing} already on the list`);
+  if (r.skipped) parts.push(`${r.skipped} skipped because too short`);
+  return parts.join(', ') + '.';
+}
+
+function renderTerms(t) {
+  const more = t.count > t.terms.length ? `<div class="small">Showing the newest ${t.terms.length} of ${t.count.toLocaleString()}.</div>` : '';
+  document.getElementById('termlist').innerHTML = (t.count
+    ? t.terms.map(x => `<div class="item"><span>${esc(x.term)}</span><button class="remove" data-term="${x.id}">Remove</button></div>`).join('')
+    : '<div class="muted empty-note">No names or private details on the list yet.</div>') + more;
+  document.querySelectorAll('[data-term]').forEach(b => armRemove(b, () => post(`/api/masking/terms/${b.dataset.term}/remove`)));
+}
+
+function renderMasking(items, terms) {
   const known = ui.seenMask;
   ui.seenMask = new Set(items.map(i => i.id));
   const row = i => {
@@ -153,7 +195,29 @@ function renderMasking(items) {
   };
   const group = (name, grp) => { const list = items.filter(i => i.grp === grp); return list.length ? `<div class="group"><div class="eyebrow">${name}</div>${list.map(row).join('')}</div>` : ''; };
   if (!document.getElementById('masklist')) {
-    document.getElementById('main').innerHTML = `<form class="ruleform" id="ruleform"><input id="ruletext" placeholder="Add a rule in plain words, like: mask all numbers" autocomplete="off"><button>Add</button></form><div class="small" id="rulereply"></div><div id="masklist"></div>`;
+    document.getElementById('main').innerHTML = `<section class="firmlist"><h2>Firm masking list</h2><p class="muted">Always masked before anything goes to the cloud, for everyone at the firm.</p>
+      <form class="ruleform" id="termform"><input id="termtext" aria-label="Name or private detail" placeholder="Add a name or private detail" autocomplete="off"><button>Add</button><button type="button" id="termfile">Upload file</button><input id="termpick" type="file" accept=".txt,.csv" hidden></form>
+      <div class="small" id="termreply" role="status"></div><div id="termlist"></div></section>
+      <section class="firmlist"><h2>Masking rules</h2><form class="ruleform" id="ruleform"><input id="ruletext" aria-label="Masking rule" placeholder="Add a rule in plain words, like: mask all numbers" autocomplete="off"><button>Add</button></form><div class="small" id="rulereply"></div><div id="masklist"></div></section>`;
+    const termReplyEl = document.getElementById('termreply');
+    const refresh = () => { ui.last = {}; tick(); };
+    document.getElementById('termform').onsubmit = async ev => {
+      ev.preventDefault();
+      const box = document.getElementById('termtext');
+      if (!box.value.trim()) return;
+      try { termReplyEl.textContent = termReply(await post('/api/masking/terms', { text: box.value })); box.value = ''; refresh(); }
+      catch (e) { termReplyEl.textContent = e.detail || 'Could not add that.'; }
+    };
+    const pick = document.getElementById('termpick');
+    document.getElementById('termfile').onclick = () => pick.click();
+    pick.onchange = async () => {
+      const file = pick.files[0];
+      pick.value = '';
+      if (!file) return;
+      termReplyEl.textContent = `Reading ${file.name}…`;
+      try { termReplyEl.textContent = termReply(await post('/api/masking/terms/upload', { filename: file.name, text: await file.text() })); refresh(); }
+      catch (e) { termReplyEl.textContent = e.detail || 'Could not read that file.'; }
+    };
     document.getElementById('ruleform').onsubmit = async ev => {
       ev.preventDefault();
       const box = document.getElementById('ruletext');
@@ -166,6 +230,7 @@ function renderMasking(items) {
       ui.last = {}; tick();
     };
   }
+  renderTerms(terms);
   document.getElementById('masklist').innerHTML = group('Always', 'always') + group('Default', 'default') + group('Added', 'added');
   document.querySelectorAll('[data-mask]').forEach(b => b.onclick = async () => { await post('/api/masking/default', { name: b.dataset.mask, on: b.dataset.on === '1' }); ui.last = {}; tick(); });
 }
@@ -180,20 +245,14 @@ function changed(name, value) {
 async function tick() {
   try {
     const board = await api('/api/board');
-    const cloudText = board.cloud.standin ? `Cloud: ${board.cloud.model}` : board.cloud.model;
-    document.getElementById('status').textContent = `${board.box.machine} · ${board.box.models.join(' · ')} · ${board.cloud.online ? 'Online' : 'Offline'} · ${cloudText}`;
     if (ui.tab === 'board' && changed('board', [board.people, board.savings, board.runs.day.running])) renderBoard(board);
     if (ui.tab === 'requests') {
       const data = await api(`/api/requests${ui.person ? `?user=${ui.person}` : ''}`);
       if (changed('requests', [data, ui.selected])) renderRequests(data);
       if (ui.selected && changed('detail', [ui.selected, data.requests.find(r => r.id === ui.selected)])) await renderDetail(ui.selected);
     }
-    if (ui.tab === 'queue') { const q = await api('/api/queue'); if (changed('queue', q)) renderQueue(q); }
-    if (ui.tab === 'audit') {
-      const params = new URLSearchParams(); if (ui.auditUser) params.set('user', ui.auditUser); if (ui.auditDest) params.set('dest', ui.auditDest);
-      const a = await api('/api/audit?' + params); if (changed('audit', a)) renderAudit(a);
-    }
-    if (ui.tab === 'masking') { const m = await api('/api/masking'); if (changed('masking', m)) renderMasking(m); }
+    if (ui.tab === 'masking') { const [m, t] = await Promise.all([api('/api/masking'), api('/api/masking/terms')]); if (changed('masking', [m, t])) renderMasking(m, t); }
+    if (ui.tab === 'people') { const t = await api('/api/team'); if (changed('team', t)) renderPeople(t); }
   } catch (e) { if (e.signin) location.reload(); }
 }
 
@@ -201,15 +260,14 @@ document.addEventListener('keydown', ev => {
   if (ev.target.matches('input, textarea, select')) return;
   if (ev.key === '1') go('board');
   if (ev.key === '2') go('requests');
-  if (ev.key === '3') go('audit');
-  if (ev.key === 'm') go('masking');
+  if (ev.key === '3' || ev.key === 'm') go('masking');
   if (ev.key === 'f') post('/api/day/start');
   if (ev.key === 'Escape') { ui.closedAt = ui.selected; ui.selected = null; ui.pinned = false; ui.last = {}; const d = document.getElementById('detail'); if (d) d.innerHTML = ''; }
 });
 
-signIn(root, 'partner', async () => {
+signIn(root, EMBEDDED ? 'partner' : null, async () => {
   const me = await api('/api/me');
-  if (me.role !== 'partner') { location.href = '/chat'; return; }
+  if (!me.managing) { location.href = '/'; return; }
   shell();
   tick();
   setInterval(tick, 1000);

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Chamber</title><link rel="stylesheet" href="/static/style.css"></head>
+<title>Chamber</title><link rel="icon" href="/static/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="/static/style.css"></head>
 <body><div id="root"></div>
 <script src="/static/common.js"></script>
 <script>
@@ -19,9 +19,23 @@ function destClass(label) {
   return 'blocked';
 }
 
+// The route alone, like "On device". Timings and scores stay in the record.
+function shortLabel(label) {
+  const route = label.split(' · ')[0];
+  return route[0] + route.slice(1).toLowerCase();
+}
+
+const MAKERS = [[/^lfm/, 'Liquid'], [/^llama/, 'Meta'], [/^qwen/, 'Alibaba'], [/^gemma/, 'Google'], [/^phi/, 'Microsoft'], [/^mistral/, 'Mistral'], [/^deepseek/, 'DeepSeek'], [/^granite/, 'IBM']];
+const CLOUD_NAMES = { 'claude-opus-5-5': 'Claude Opus 5.5' };
+function modelName(m) {
+  if (CLOUD_NAMES[m]) return `Cloud · ${CLOUD_NAMES[m]}`;
+  const maker = MAKERS.find(([pattern]) => pattern.test(m));
+  return maker ? `${maker[1]} · ${m}` : m;
+}
+
 function shell() {
   root.innerHTML = `<div class="chat empty" id="chat">
-    <header><div class="who">${esc(state.me.matters.map(m => m.name).join(', '))}</div><span id="online" class="muted"></span></header>
+    <header>${BRAND}<div class="who muted">${esc(state.me.matters.map(m => m.name).join(', '))}</div><span class="spacer"></span><span id="online" class="muted"></span>${pane ? '' : `<nav class="topnav">${state.me.managing ? '<a href="/manage">Manage</a>' : ''}<button type="button" id="signout">Sign out</button></nav>`}</header>
     <div class="log" id="log"></div>
     <div class="tools"><div id="try"></div></div>
     <div class="composerwrap"><div class="composer">
@@ -32,10 +46,11 @@ function shell() {
         <div class="taskmenu" id="taskmenu"><button type="button" id="taskbtn">Tasks ▾</button><div class="tasklist" id="tasklist" hidden></div></div>
         <span class="spacer"></span>
         <div class="modelmenu" id="modelmenu"><button type="button" id="modelbtn" aria-haspopup="listbox"></button><div class="modellist" id="modellist" role="listbox" hidden></div></div>
-        <button id="send" aria-label="Send">↑</button>
+        <button id="send" aria-label="Send"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg></button>
       </div>
     </div></div>
   </div>`;
+  document.getElementById('signout')?.addEventListener('click', signOut);
   document.getElementById('attachbtn').onclick = () => { const l = document.getElementById('attachlist'); l.hidden = !l.hidden; };
   const text = document.getElementById('text');
   text.onkeydown = ev => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); send(); } };
@@ -58,9 +73,9 @@ function autosize() {
 }
 
 function renderModelMenu() {
-  document.getElementById('modelbtn').textContent = `${state.model} ▾`;
+  document.getElementById('modelbtn').textContent = `${CLOUD_NAMES[state.model] || state.model} ▾`;
   const list = document.getElementById('modellist');
-  const html = state.models.map(m => `<button type="button" role="option" data-model="${esc(m)}" class="${m === state.model ? 'on' : ''}">Liquid · ${esc(m)}</button>`).join('');
+  const html = state.models.map(m => `<button type="button" role="option" data-model="${esc(m)}" class="${m === state.model ? 'on' : ''}">${esc(modelName(m))}</button>`).join('');
   if (list.dataset.html === html) return;
   list.innerHTML = html;
   list.dataset.html = html;
@@ -88,6 +103,7 @@ async function loadTry() {
     `<button class="try" data-i="${i}">${esc(SHORT[t.kind] || t.label)}${t.doc_ids.length ? '<span class="filemark">+ file</span>' : ''}</button>`).join('');
   document.getElementById('try').innerHTML = items;
   document.getElementById('tasklist').innerHTML = items;
+  document.getElementById('taskmenu').hidden = !state.tryItems.length;
   document.querySelectorAll('.try').forEach(b => b.onclick = () => {
     document.getElementById('tasklist').hidden = true;
     const t = state.tryItems[Number(b.dataset.i)];
@@ -129,8 +145,8 @@ function messageHtml(m) {
   }
   return `<div class="ask"><div class="bubble"><div class="body ${long && !open ? 'short' : ''}" data-open="${m.id}">${esc(m.text)}</div></div>
       ${m.docs.map(d => `<div><span class="attachment"><span class="eyebrowish">Privileged file</span>${esc(d)}</span></div>`).join('')}</div>
-    <div>${m.reply && !(m.label || '').startsWith('HUMAN') ? `<div class="reply">${esc(m.reply)}</div>` : ''}
-      ${m.label ? `<div class="line dest ${cls}">${esc(m.label)}</div>` : ''}
+    <div>${m.reply ? `<div class="reply">${esc(m.reply)}</div>` : ''}
+      ${m.label ? `<div class="line dest ${cls}">${esc(shortLabel(m.label))}</div>` : ''}
       ${m.status === 'working' ? DOTS : ''}
       ${extra ? `<div class="small">${extra}</div>` : ''}
     </div>`;
@@ -156,7 +172,7 @@ async function poll() {
     state.models = data.models; state.model = state.choosing || data.model;
     if (state.choosing === data.model) state.choosing = null;
     renderModelMenu();
-    document.getElementById('online').textContent = (data.online ? 'Online' : 'Offline') + (data.standin ? ` · Cloud: ${data.cloud}` : '');
+    document.getElementById('online').textContent = data.online ? '' : 'Offline';
     const snapshot = JSON.stringify(data.messages);
     if (snapshot !== state.last) { state.last = snapshot; messages = data.messages; render(); }
   } catch (e) { if (e.signin) location.reload(); }
@@ -165,9 +181,9 @@ async function poll() {
 const pane = new URLSearchParams(location.search).get('pane');
 signIn(root, pane, async () => {
   state.me = await api('/api/me');
-  if (state.me.role === 'partner') { location.href = '/'; return; }
   shell();
   state.docs = await api('/api/docs');
+  document.getElementById('attachmenu').hidden = !state.docs.length;
   const list = document.getElementById('attachlist');
   list.innerHTML = state.docs.map(d => `<button type="button" data-doc="${d.id}">${esc(d.title)}</button>`).join('');
   list.querySelectorAll('[data-doc]').forEach(b => b.onclick = () => {

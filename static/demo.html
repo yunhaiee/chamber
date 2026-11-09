@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Chamber</title><link rel="stylesheet" href="/static/style.css"></head>
+<title>Chamber</title><link rel="icon" href="/static/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="/static/style.css"></head>
 <body><div class="stage">
   <div class="switch" role="tablist">
     <button class="on" data-pane="maya" role="tab">Maya Chen</button>
@@ -11,7 +11,7 @@
     <iframe id="maya" title="Maya Chen" src="/chat?pane=left"></iframe>
     <iframe id="daniel" title="Daniel Osei" src="/chat?pane=right" hidden></iframe>
   </div>
-  <iframe id="board" title="Firm dashboard" src="/?pane=partner"></iframe>
+  <iframe id="board" title="Firm dashboard" src="/manage?pane=partner"></iframe>
 </div>
 <script>
 document.querySelectorAll('.switch button').forEach(b => b.onclick = () => {

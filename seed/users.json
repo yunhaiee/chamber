@@ -1,19 +1,29 @@
 {
   "users": [
-    {"id": "maya", "name": "Maya Chen", "role": "associate", "title": "Litigation associate", "pin": "1111", "matters": ["harlow"]},
-    {"id": "daniel", "name": "Daniel Osei", "role": "associate", "title": "Estates associate", "pin": "2222", "matters": ["rourke"]},
-    {"id": "ruth", "name": "Ruth Abernathy", "role": "partner", "title": "Managing partner", "pin": "3333", "matters": []}
+    {"id": "maya", "name": "Maya Chen", "role": "employee", "title": "Litigation associate", "pin": "1111", "matters": ["harlow"], "reports_to": "ruth"},
+    {"id": "daniel", "name": "Daniel Osei", "role": "employee", "title": "Estates associate", "pin": "2222", "matters": ["rourke"], "reports_to": "ruth"},
+    {"id": "ruth", "name": "Ruth Abernathy", "role": "head", "title": "Managing partner", "pin": "3333", "matters": [], "reports_to": null}
   ],
   "matters": [
     {
       "id": "harlow",
       "name": "Harlow Orchards v. Brightline Freight",
-      "parties": ["Harlow Orchards", "Brightline Freight", "Sunvale Foods", "Tidewell Insurance", "Corbel Robotics"]
+      "parties": [
+        "Harlow Orchards",
+        "Brightline Freight",
+        "Sunvale Foods",
+        "Tidewell Insurance",
+        "Corbel Robotics"
+      ]
     },
     {
       "id": "rourke",
       "name": "Estate of Rourke",
-      "parties": ["Helen Rourke", "Rourke Family Trust", "Pinecrest Labs"]
+      "parties": [
+        "Helen Rourke",
+        "Rourke Family Trust",
+        "Pinecrest Labs"
+      ]
     }
   ]
 }

@@ -34,7 +34,7 @@ curl -s localhost:11434/api/chat -d '{"model":"lfm3:1.7b","stream":false,"messag
 
 **One window, full screen:** open `http://localhost:8000/demo`. The **Maya Chen | Daniel Osei** switch at the top changes both the chat on the left and the board on the right.
 
-**Check:** the board is empty and the chat says Online.
+**Check:** the board is empty and the chat doesn't say Offline. The page no longer shows when the cloud is a stand-in, so read the terminal: `clean_start.sh` prints a warning if there's no key.
 
 **To rehearse again:** click **Reset** at the top right, then click it again to confirm. It erases all history and reloads the page. It says `Still working` until any running request or firm's day finishes. If the app itself is misbehaving, rerun `./scripts/clean_start.sh 8000` and refresh.
 
@@ -63,7 +63,7 @@ Correct answers: December 12, 2026, Dept 330 · September 13, 2026, Dept 386 · 
 
 **You should see:** on the Board, Maya's **Public lookup** goes from Testing to **On device**.
 
-**Say:** "Liquid's d1 model reads every request on this device and decides where it can go. This one is public, so both models answer, and the lawyer picks without knowing which is which. After three good answers, the cloud stops being called. We set it to three to keep this demo short. Each Liquid model earns its own record."
+**Say:** "Liquid's d1 model reads every request on this device and decides where it can go. This one is public, so both models answer, and the lawyer picks without knowing which is which. After three good answers, the cloud stops being called. We set it to three to keep this demo short. Each model earns its own record."
 
 ### 1:00 Masking (15s)
 
@@ -78,7 +78,7 @@ Correct answers: December 12, 2026, Dept 330 · September 13, 2026, Dept 386 · 
 
 **1. A privileged file.** Maya: pick **Summarize deposition** under Tasks. Point at the **Privileged file** tag, then press Enter.
 
-**You should see:** `ON DEVICE · privileged file attached`
+**You should see:** `On device`
 
 **Say:** "If a lawyer attaches a client file, it stays on device. That's a fixed rule."
 
@@ -90,7 +90,7 @@ Don't read the bullets aloud, because the summary runs long.
 What is the deadline to remove a case to federal court? Here is the email from our client: 'Maya, please keep this between us. We deleted the alarm log after Brightline called, and I am worried about it.'
 ```
 
-**You should see:** `KEPT ON DEVICE · d1 privileged 0.90`
+**You should see:** `Kept on device`
 
 **Say:** "No file here, just a question with a client's email pasted in. d1 catches it, and the router refuses to send it."
 
@@ -116,12 +116,12 @@ Give it about 30 seconds.
 ### 2:30 Human in the loop (10s)
 Still on Maya. Type `Should we accept Brightline's offer?`
 
-**You should see:** `HUMAN · Added to Ruth Abernathy's queue.`
+**You should see:** `Added to Ruth Abernathy's queue.` and `Human`
 
 **Say:** "d1 recognizes a legal decision. No AI answers it. It goes to a person."
 
 ### 2:40 Close (20s)
-Click **Audit log**. Point at `Privileged text sent to cloud 0` and `Log intact`. Click **Board**.
+Click **Requests**. Point at the **Where** column. Click **Board**.
 
 **Say:** "Nothing privileged left the building, and the managing partner can read exactly what did.
 
@@ -148,9 +148,9 @@ Don't decide what runs locally. Let the local model prove it."
 ## Say this honestly
 
 - The firm, its matters and documents are synthetic. Every route, check and log entry on screen is real and live.
-- This runs on a Mac laptop, and the header shows the real machine name. It hasn't been run on dedicated AI hardware yet.
+- This runs on a Mac laptop. It hasn't been run on dedicated AI hardware yet.
 - 3 trials is a demo bar. A real firm would need far more.
-- "Privileged text sent 0" means our leak test found none. It catches exact client names, secrets, emails and runs of 8 words from a document, so a paraphrase would get past it. d1 can misjudge, which is why thresholds lean toward privileged and hard rules back it up. This reduces risk. It doesn't replace a firm's ethics obligations.
+- "Nothing privileged left" means our leak test found none. It catches exact client names, secrets, emails and runs of 8 words from a document, so a paraphrase would get past it. d1 can misjudge, which is why thresholds lean toward privileged and hard rules back it up. This reduces risk. It doesn't replace a firm's ethics obligations.
 - Research answers come from the cloud and still need checking against the source. This isn't legal advice.
 - Nobody has asked a law firm yet, so ask people in the room.
 
@@ -174,7 +174,7 @@ Actions planned while working on privileged text are logged and never run.
 On 144 prepared requests it picked the right kind every time, at about 0.4s median. No privileged request scored as public at the 0.30 threshold, and 5 of 24 public questions were held back as false alarms.
 
 **Does each model really keep its own record?**
-Yes. Pick another Liquid model in the menu next to the send button, and that person's board starts empty. Pick the first one again and the rows come back.
+Yes. Pick another model in the menu next to the send button, and that person's board starts empty. Pick the first one again and the rows come back.
 
 **Why does the other model score so badly?**
 Prompts were tuned on `lfm3:1.7b` and not retuned. Treat those numbers as a first look.

@@ -13,9 +13,15 @@ TYPE = {"LOCAL": "On device", "PROVEN": "On device", "SHADOW": "Testing", "CLAUD
 
 
 def model(user):
-    """The Liquid model this person has chosen. Evidence is kept per model."""
+    """The local model this person has chosen. Evidence is kept per model."""
     row = db.one("SELECT model FROM user_models WHERE user=?", user)
     return row["model"] if row else llm.LOCAL_MODEL
+
+
+def local_model(user):
+    """The model for work that stays on the device, which is all privileged work even when someone chose the cloud."""
+    chosen = model(user)
+    return llm.LOCAL_MODEL if llm.is_cloud(chosen) else chosen
 
 
 def set_model(user, name):
@@ -44,7 +50,8 @@ def ensure(user, kind, path):
         if prepared.PATH.get(kind, ("", ""))[1] == "never":
             state = "LAWYER"
         else:
-            state = "SHADOW" if path == "public" else "LOCAL"
+            public = "CLAUDE" if llm.is_cloud(model(user)) else "SHADOW"  # someone who chose the cloud isn't testing a local model
+            state = public if path == "public" else "LOCAL"
         db.run("INSERT INTO row_events (user, kind, model, from_state, to_state, reason, ts) VALUES (?,?,?,?,?,?,?)",
                user, kind, model(user), None, state, "first request", db.now())
         return state
@@ -130,10 +137,13 @@ def _median(values):
     return int(statistics.median(values)) if values else None
 
 
-def savings():
-    """Numbers for the top of the board. Calls avoided counts work that earned its way on device."""
-    avoided = db.one("SELECT COUNT(*) n FROM requests WHERE state_at_time='PROVEN' AND destination='box'")["n"]
-    both = db.all("SELECT box_ms, cloud_ms FROM requests WHERE box_ms IS NOT NULL AND cloud_ms IS NOT NULL")
+def savings(users=None):
+    """Numbers for the top of the board. Calls avoided counts work that earned its way on device. users=None is the whole firm."""
+    scope, args = "", []
+    if users is not None:
+        scope, args = f" AND user IN ({','.join('?' * len(users))})", list(users)
+    avoided = db.one(f"SELECT COUNT(*) n FROM requests WHERE state_at_time='PROVEN' AND destination='box'{scope}", *args)["n"]
+    both = db.all(f"SELECT box_ms, cloud_ms FROM requests WHERE box_ms IS NOT NULL AND cloud_ms IS NOT NULL{scope}", *args)
     return {"avoided": avoided, "device_ms": _median(r["box_ms"] for r in both), "cloud_ms": _median(r["cloud_ms"] for r in both), "compared": len(both)}
 
 

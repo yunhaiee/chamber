@@ -76,6 +76,14 @@ KINDS_BY_USER = {
 }
 
 
+ALL_KINDS = list(dict.fromkeys(k for kinds in KINDS_BY_USER.values() for k in kinds))
+
+
+def kinds_for(user):
+    """The fictional people have their own task lists. Everyone else can ask for any kind of work."""
+    return KINDS_BY_USER.get(user, ALL_KINDS)
+
+
 def label_for(user, kind):
     if kind == "public_research":
         return RESEARCH_LABEL.get(user, "Research")

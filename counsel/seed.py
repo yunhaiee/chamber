@@ -11,7 +11,7 @@ DATA = Path(os.environ.get("SH_DATA", ROOT / "data"))
 
 
 HISTORY = ("requests", "evidence", "cloud_evidence", "row_events", "queue", "audit", "cloud_payloads",
-           "actions", "try_pointer", "user_models", "mask_items")
+           "actions", "try_pointer", "user_models", "mask_items", "mask_terms")
 
 
 def load():
@@ -32,6 +32,13 @@ def clear_history():
         raise
 
 
+def empty():
+    """A real firm's database: tables and masking defaults, no fictional people."""
+    db.init()
+    if not db.one("SELECT id FROM mask_items LIMIT 1"):
+        masking.seed_defaults()
+
+
 def firm(data_dir=None):
     """Seed users, matters, documents and masking defaults into an empty database."""
     db.init()
@@ -39,7 +46,8 @@ def firm(data_dir=None):
         return
     seed = load()
     for u in seed["users"]:
-        db.run("INSERT INTO users VALUES (?,?,?,?,?)", u["id"], u["name"], u["role"], u["title"], u["pin"])
+        db.run("INSERT INTO users (id, name, role, title, pin, reports_to) VALUES (?,?,?,?,?,?)",
+               u["id"], u["name"], u["role"], u["title"], u["pin"], u["reports_to"])
         for matter in u["matters"]:
             db.run("INSERT INTO memberships VALUES (?,?)", u["id"], matter)
     for m in seed["matters"]:

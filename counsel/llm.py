@@ -21,8 +21,8 @@ CLOUD_HOST = os.environ.get("SH_CLOUD_HOST", "api.anthropic.com")
 OPTIONS = {"temperature": 0, "seed": 7, "num_predict": 900}
 
 
-# Liquid models a person can pick. lfm2.5:24b is left out: it returned empty replies at this token limit on the laptop.
-LIQUID_MODELS = [LOCAL_MODEL, "lfm2.5:8b", "lfm2.5-thinking:1.2b"]
+# lfm2.5:24b is left out: it returned empty replies at this token limit on the laptop.
+NOT_OFFERED = {"lfm2.5:24b"}
 _models_cache = (0.0, [LOCAL_MODEL])
 
 
@@ -35,7 +35,7 @@ class CloudError(Exception):
 
 
 def available_models():
-    """The Liquid models this device actually has, checked at most every 30 seconds."""
+    """The chat models this device actually has, default first, checked at most every 30 seconds."""
     global _models_cache
     if time.time() - _models_cache[0] < 30:
         return _models_cache[1]
@@ -43,11 +43,20 @@ def available_models():
     if LOCAL_API == "ollama":
         try:
             names = {m["name"] for m in httpx.get(f"{LOCAL_BASE}/api/tags", timeout=2).json()["models"]}
-            found = [m for m in LIQUID_MODELS if m in names] or found
+            # Without a key the stand-in plays the cloud, so offering it here would grade it against itself.
+            hidden = NOT_OFFERED | ({STANDIN_MODEL} if not has_cloud_key() else set())
+            others = sorted(n for n in names if n != LOCAL_MODEL and n not in hidden and "embed" not in n)
+            found = ([LOCAL_MODEL] if LOCAL_MODEL in names else []) + others or found
         except (httpx.HTTPError, KeyError, ValueError):
             pass
+    if has_cloud_key():  # the stand-in is not a choice: without a key there is no real cloud to pick
+        found = [*found, CLOUD_MODEL]
     _models_cache = (time.time(), found)
     return found
+
+
+def is_cloud(model):
+    return model == CLOUD_MODEL
 
 
 def first_json(text):

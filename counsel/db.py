@@ -7,7 +7,12 @@ import time
 _local = threading.local()
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT, role TEXT, title TEXT, pin TEXT);
+CREATE TABLE IF NOT EXISTS firm (id INTEGER PRIMARY KEY CHECK (id = 1), name TEXT, ts REAL);
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY, name TEXT, role TEXT, title TEXT, pin TEXT,
+  email TEXT, pw_hash TEXT, reports_to TEXT, active INTEGER DEFAULT 1);
+CREATE TABLE IF NOT EXISTS mask_terms (
+  id INTEGER PRIMARY KEY, term TEXT NOT NULL UNIQUE COLLATE NOCASE, kind TEXT, source TEXT, added_by TEXT, ts REAL);
 CREATE TABLE IF NOT EXISTS matters (id TEXT PRIMARY KEY, name TEXT, parties TEXT);
 CREATE TABLE IF NOT EXISTS memberships (user TEXT, matter TEXT, PRIMARY KEY (user, matter));
 CREATE TABLE IF NOT EXISTS documents (
@@ -44,7 +49,7 @@ CREATE TABLE IF NOT EXISTS try_pointer (user TEXT, kind TEXT, idx INTEGER DEFAUL
 
 
 def path():
-    return os.environ.get("SH_DB", "demo.db")
+    return os.environ.get("SH_DB", "chamber.db")
 
 
 def conn():
@@ -66,6 +71,11 @@ def conn():
 
 def init():
     conn().executescript(SCHEMA)
+    have = {c["name"] for c in all("PRAGMA table_info(users)")}
+    for column, kind in (("email", "TEXT"), ("pw_hash", "TEXT"), ("reports_to", "TEXT"), ("active", "INTEGER DEFAULT 1")):
+        if column not in have:  # a database made before accounts existed
+            run(f"ALTER TABLE users ADD COLUMN {column} {kind}")
+    run("CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users (email COLLATE NOCASE) WHERE email IS NOT NULL")
 
 
 def one(sql, *args):
