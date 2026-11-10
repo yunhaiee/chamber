@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Drawn } from "@/components/Bits";
 import EarnTrial from "@/components/EarnTrial";
 import Hero from "@/components/Hero";
 import MaskPlayground from "@/components/MaskPlayground";
@@ -17,14 +18,19 @@ export default function Home() {
       <section className="section" aria-labelledby="why">
         <div className="intro">
           <h2 id="why">Why firms hold back.</h2>
-          <p className="prose">Lawyers have taken up AI faster than their firms have. What holds firms back is what Chamber is built around: client information that stays private, answers they can trust, and a clear view of how AI is used.</p>
+          <p className="prose">Lawyers have taken up AI faster than their firms have. Most are already using it before their firm has set anything up.</p>
         </div>
-        <div className="numbers">
-          <div><strong>69%</strong><p><b>of legal professionals use AI tools for work</b>, up from 31% a year earlier.</p></div>
-          <div><strong>46%</strong><p><b>of firms have put AI tools in place.</b> Most lawyers are already ahead of their firm.</p></div>
-          <div><strong>46%</strong><p><b>call data security a significant barrier</b>, and 39% cite privilege concerns. So privileged text stays on device, and cloud text is masked first.</p></div>
-          <div><strong>39%</strong><p><b>cite lack of trust in AI&apos;s answers.</b> So in Chamber, a local model has to prove each task before any work moves to it.</p></div>
-          <div><strong>43%</strong><p><b>have no AI policy and no plans for one.</b> So managers keep one masking list for everyone, and the Board shows where all the work went.</p></div>
+        <figure className="gap">
+          <Drawn>
+            <div className="gap-row"><span className="gap-label">Legal professionals using AI</span><span className="gap-track"><span className="gap-fill" style={{ width: "69%" }} /></span><strong>69%</strong></div>
+            <div className="gap-row"><span className="gap-label">Firms with AI tools in place</span><span className="gap-track"><span className="gap-fill" style={{ width: "46%" }} /></span><strong>46%</strong></div>
+          </Drawn>
+          <figcaption>Use by legal professionals was 31% a year earlier.</figcaption>
+        </figure>
+        <div className="barriers">
+          <div><b>Security and privilege</b><span>46% call data security a significant barrier, and 39% cite privilege.</span><p>Chamber keeps privileged text on device and masks cloud text first.</p></div>
+          <div><b>Trust in the answers</b><span>39% cite a lack of trust in AI&apos;s answers.</span><p>In Chamber, a local model has to prove each task before work moves to it.</p></div>
+          <div><b>No policy</b><span>43% have no AI policy and no plans for one.</span><p>Managers keep one masking list for everyone, and the Board shows where all the work went.</p></div>
         </div>
         <p className="prose">The ethics rules point the same way. The ABA&apos;s 2024 opinion on generative AI says a lawyer generally needs the client&apos;s informed consent before putting client information into a self-learning AI tool, and a boilerplate clause in the engagement letter isn&apos;t enough.</p>
         <p className="small">Sources: <a className="textlink" href="https://www.8am.com/blog/ai-adoption-law-firms-2026-legal-industry-report/">8am 2026 Legal Industry Report</a>, more than 1,300 legal professionals surveyed in September and October 2025, most at solo and small firms. The barrier and policy figures are as reported by <a className="textlink" href="https://www.lawnext.com/2026/03/ai-adoption-among-legal-professionals-has-more-than-doubled-in-a-year-new-8am-report-finds-but-firms-lag-far-behind-individual-practitioners.html">LawNext</a> (March 2026). ABA Formal Opinion 512 (July 2024), summarized by the <a className="textlink" href="https://www.americanbar.org/groups/litigation/resources/newsletters/ethics-professionalism/generative-ai-lawyers-part-2-maintaining-confidentiality/">ABA Litigation Section</a>.</p>

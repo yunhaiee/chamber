@@ -233,6 +233,24 @@ h1.rotating { font-size: clamp(44px, 7.6vw, 92px); max-width: none; display: gri
 .numbers p { color: var(--muted); max-width: 36em; }
 .numbers b { color: var(--ink); font-weight: 500; }
 
+/* Adoption gap and barriers */
+.gap { margin: 0; display: grid; gap: 14px; }
+.gap .drawn { display: grid; gap: 22px; }
+.gap-row { display: grid; grid-template-columns: 300px minmax(0, 1fr) 72px; gap: 24px; align-items: center; }
+.gap-label { color: var(--muted); }
+.gap-track { display: block; height: 10px; background: var(--soft); border-radius: 5px; overflow: hidden; }
+.gap-fill { display: block; height: 100%; background: var(--ink); border-radius: 5px; transform-origin: left; }
+.js .drawn .gap-fill { transform: scaleX(0); transition: transform 1s cubic-bezier(.2, .7, .2, 1); }
+.js .drawn.in .gap-fill { transform: none; }
+.js .drawn.in .gap-row + .gap-row .gap-fill { transition-delay: .15s; }
+.gap strong { font-size: 32px; font-weight: 300; letter-spacing: -.03em; line-height: 1; text-align: right; }
+.gap figcaption { font-size: 14px; color: var(--muted); }
+.barriers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 40px; }
+.barriers > div { display: grid; gap: 6px; align-content: start; padding-top: 16px; border-top: 1px solid var(--line); }
+.barriers b { font-weight: 500; }
+.barriers span { color: var(--muted); }
+.barriers p { margin-top: 8px; }
+
 /* Accordion */
 details { border-top: 1px solid var(--line); }
 summary { cursor: pointer; padding-block: 15px; font-weight: 500; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
@@ -261,6 +279,7 @@ details p { padding-bottom: 16px; color: var(--muted); max-width: 40em; }
   .menu { display: block; }
   .two, .sim, .link-row, .grid2, .foot .wrap { grid-template-columns: minmax(0, 1fr); gap: 28px; }
   .grid2 { gap: 0; }
+  .barriers { grid-template-columns: minmax(0, 1fr); gap: 24px; }
 }
 @media (max-width: 680px) {
   :root { --gutter: 16px; }
@@ -268,6 +287,9 @@ details p { padding-bottom: 16px; color: var(--muted); max-width: 40em; }
   .lede, .prose { font-size: 19px; }
   .row3, .row2, .numbers > div { grid-template-columns: minmax(0, 1fr); gap: 6px; justify-items: start; }
   .mask-grid { grid-template-columns: minmax(0, 1fr); }
+  .gap-row { grid-template-columns: minmax(0, 1fr) 56px; gap: 8px 16px; }
+  .gap-label { grid-column: 1 / -1; }
+  .gap strong { font-size: 26px; }
   .answers { grid-template-columns: minmax(0, 1fr); }
   .panel { padding: 18px; }
 }
