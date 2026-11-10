@@ -33,7 +33,7 @@ export default function Home() {
           <div><strong>43%</strong><span>have no AI policy and no plans for one</span><p>One masking list and one view of all work.</p></div>
         </div>
         <p className="prose">The ABA agrees: lawyers generally need client consent before client information goes into a self-learning AI tool.</p>
-        <p className="small">Sources: <a className="textlink" href="https://www.8am.com/blog/ai-adoption-law-firms-2026-legal-industry-report/">8am 2026 Legal Industry Report</a>, 1,300+ legal professionals, via <a className="textlink" href="https://www.lawnext.com/2026/03/ai-adoption-among-legal-professionals-has-more-than-doubled-in-a-year-new-8am-report-finds-but-firms-lag-far-behind-individual-practitioners.html">LawNext</a>; <a className="textlink" href="https://www.americanbar.org/groups/litigation/resources/newsletters/ethics-professionalism/generative-ai-lawyers-part-2-maintaining-confidentiality/">ABA Formal Opinion 512</a> (2024).</p>
+        <p className="small cite">Sources: <a className="textlink" href="https://www.8am.com/blog/ai-adoption-law-firms-2026-legal-industry-report/">8am 2026 Legal Industry Report</a>, 1,300+ legal professionals, via <a className="textlink" href="https://www.lawnext.com/2026/03/ai-adoption-among-legal-professionals-has-more-than-doubled-in-a-year-new-8am-report-finds-but-firms-lag-far-behind-individual-practitioners.html">LawNext</a>; <a className="textlink" href="https://www.americanbar.org/groups/litigation/resources/newsletters/ethics-professionalism/generative-ai-lawyers-part-2-maintaining-confidentiality/">ABA Formal Opinion 512</a> (2024).</p>
       </section>
 
       <section className="section">

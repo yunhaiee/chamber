@@ -300,3 +300,4 @@ details p { padding-bottom: 16px; color: var(--muted); max-width: 40em; }
 }
 
 .visually-none { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.cite { max-width: none; }
