@@ -3,7 +3,7 @@ import { Drawn } from "@/components/Bits";
 import EarnTrial from "@/components/EarnTrial";
 import Hero from "@/components/Hero";
 import MaskPlayground from "@/components/MaskPlayground";
-import { GITHUB } from "@/lib/site";
+import { DEMO, DEMO_ID, GITHUB } from "@/lib/site";
 
 export default function Home() {
   return (
@@ -34,6 +34,24 @@ export default function Home() {
         </div>
         <p className="prose">The ABA agrees: lawyers generally need client consent before client information goes into a self-learning AI tool.</p>
         <p className="small cite">Sources: <a className="textlink" href="https://www.8am.com/blog/ai-adoption-law-firms-2026-legal-industry-report/">8am 2026 Legal Industry Report</a>, 1,300+ legal professionals, via <a className="textlink" href="https://www.lawnext.com/2026/03/ai-adoption-among-legal-professionals-has-more-than-doubled-in-a-year-new-8am-report-finds-but-firms-lag-far-behind-individual-practitioners.html">LawNext</a>; <a className="textlink" href="https://www.americanbar.org/groups/litigation/resources/newsletters/ethics-professionalism/generative-ai-lawyers-part-2-maintaining-confidentiality/">ABA Formal Opinion 512</a> (2024).</p>
+      </section>
+
+      <section className="section" id="demo" aria-labelledby="demo-title">
+        <div className="intro">
+          <h2 id="demo-title">Watch it run.</h2>
+          <p className="prose">A walkthrough of Chamber on a real machine: each request read on device, then answered locally, masked for the cloud, or sent to a person.</p>
+        </div>
+        <div className="video">
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${DEMO_ID}?rel=0`}
+            title="Chamber demo"
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+          />
+        </div>
+        <p className="small"><a className="textlink" href={DEMO}>Open on YouTube</a></p>
       </section>
 
       <section className="section">

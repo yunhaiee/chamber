@@ -30,6 +30,7 @@ export default function Hero() {
         <p className="lede">Don&apos;t decide what runs locally. Let the local model prove it. Chamber moves the work a small model handles well onto your own machine, and keeps privileged text from leaving.</p>
         <div className="actions">
           <Link className="btn main" href="/start/">Get started</Link>
+          <a className="btn quiet" href="#demo">Watch the demo</a>
           <a className="btn quiet" href={GITHUB}>View on GitHub</a>
         </div>
       </div>
