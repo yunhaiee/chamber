@@ -246,10 +246,10 @@ h1.rotating { font-size: clamp(44px, 7.6vw, 92px); max-width: none; display: gri
 .gap strong { font-size: 32px; font-weight: 300; letter-spacing: -.03em; line-height: 1; text-align: right; }
 .gap figcaption { font-size: 14px; color: var(--muted); }
 .barriers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 40px; }
-.barriers > div { display: grid; gap: 6px; align-content: start; padding-top: 16px; border-top: 1px solid var(--line); }
-.barriers b { font-weight: 500; }
+.barriers > div { display: grid; gap: 4px; align-content: start; padding-top: 18px; border-top: 1px solid var(--line); }
+.barriers strong { font-size: 56px; font-weight: 300; letter-spacing: -.04em; line-height: 1.05; }
 .barriers span { color: var(--muted); }
-.barriers p { margin-top: 8px; }
+.barriers p { margin-top: 10px; font-weight: 500; }
 
 /* Accordion */
 details { border-top: 1px solid var(--line); }

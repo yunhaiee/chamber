@@ -28,12 +28,12 @@ export default function Home() {
           <figcaption>Use by legal professionals was 31% a year earlier.</figcaption>
         </figure>
         <div className="barriers">
-          <div><b>Security and privilege</b><span>46% call data security a significant barrier, and 39% cite privilege.</span><p>Chamber keeps privileged text on device and masks cloud text first.</p></div>
-          <div><b>Trust in the answers</b><span>39% cite a lack of trust in AI&apos;s answers.</span><p>In Chamber, a local model has to prove each task before work moves to it.</p></div>
-          <div><b>No policy</b><span>43% have no AI policy and no plans for one.</span><p>Managers keep one masking list for everyone, and the Board shows where all the work went.</p></div>
+          <div><strong>46%</strong><span>call data security a significant barrier</span><p>Privileged text stays on device.</p></div>
+          <div><strong>39%</strong><span>cite a lack of trust in AI&apos;s answers</span><p>A local model proves each task first.</p></div>
+          <div><strong>43%</strong><span>have no AI policy and no plans for one</span><p>One masking list and one view of all work.</p></div>
         </div>
-        <p className="prose">The ethics rules point the same way. The ABA&apos;s 2024 opinion on generative AI says a lawyer generally needs the client&apos;s informed consent before putting client information into a self-learning AI tool, and a boilerplate clause in the engagement letter isn&apos;t enough.</p>
-        <p className="small">Sources: <a className="textlink" href="https://www.8am.com/blog/ai-adoption-law-firms-2026-legal-industry-report/">8am 2026 Legal Industry Report</a>, more than 1,300 legal professionals surveyed in September and October 2025, most at solo and small firms. The barrier and policy figures are as reported by <a className="textlink" href="https://www.lawnext.com/2026/03/ai-adoption-among-legal-professionals-has-more-than-doubled-in-a-year-new-8am-report-finds-but-firms-lag-far-behind-individual-practitioners.html">LawNext</a> (March 2026). ABA Formal Opinion 512 (July 2024), summarized by the <a className="textlink" href="https://www.americanbar.org/groups/litigation/resources/newsletters/ethics-professionalism/generative-ai-lawyers-part-2-maintaining-confidentiality/">ABA Litigation Section</a>.</p>
+        <p className="prose">The ABA agrees: lawyers generally need client consent before client information goes into a self-learning AI tool.</p>
+        <p className="small">Sources: <a className="textlink" href="https://www.8am.com/blog/ai-adoption-law-firms-2026-legal-industry-report/">8am 2026 Legal Industry Report</a>, 1,300+ legal professionals, via <a className="textlink" href="https://www.lawnext.com/2026/03/ai-adoption-among-legal-professionals-has-more-than-doubled-in-a-year-new-8am-report-finds-but-firms-lag-far-behind-individual-practitioners.html">LawNext</a>; <a className="textlink" href="https://www.americanbar.org/groups/litigation/resources/newsletters/ethics-professionalism/generative-ai-lawyers-part-2-maintaining-confidentiality/">ABA Formal Opinion 512</a> (2024).</p>
       </section>
 
       <section className="section">
