@@ -266,6 +266,14 @@ def pick(body: dict, user=Depends(me)):
     return result
 
 
+def _flow(ids):
+    """How many requests went where, per person and task. Counts only, never the text."""
+    return db.all(
+        f"""SELECT user, COALESCE(kind,'other') kind, destination dest, COUNT(*) n FROM requests
+            WHERE source!='bench' AND status!='working' AND destination IS NOT NULL AND user IN ({','.join('?' * len(ids))})
+            GROUP BY user, COALESCE(kind,'other'), destination""", *ids)
+
+
 @app.get("/api/board")
 def board(user=Depends(managing)):
     ids = accounts.visible_ids(user)
@@ -278,6 +286,8 @@ def board(user=Depends(managing)):
         ],
         "runs": day.status(),
         "savings": states.savings(None if user["role"] == accounts.HEAD else ids),
+        "flow": _flow(ids),
+        "tasks": prepared.LABELS,
         "demo": demo,
     }
 
@@ -309,12 +319,19 @@ def _short_result(row):
 
 
 @app.get("/api/requests")
-def list_requests(user: str = "", after: int = 0, viewer=Depends(managing)):
+def list_requests(user: str = "", kind: str = "", dest: str = "", after: int = 0, viewer=Depends(managing)):
     ids = accounts.visible_ids(viewer)
     if user:
         ids = [i for i in ids if i == user]
     scope = f"user IN ({','.join('?' * len(ids))})"
-    sql, args = f"SELECT * FROM requests WHERE id>? AND source!='bench' AND {scope}", [after, *ids]
+    sql, args = f"SELECT * FROM requests WHERE id>? AND source!='bench' AND status!='working' AND {scope}", [after, *ids]
+    if kind:
+        sql += " AND COALESCE(kind,'other')=?"
+        args.append(kind)
+    if dest:
+        sql += " AND destination=?"
+        args.append(dest)
+    total = db.one(sql.replace("SELECT *", "SELECT COUNT(*) n", 1), *args)["n"]
     names = {u["id"]: u["name"] for u in db.all("SELECT id, name FROM users")}
     rows = db.all(sql + " ORDER BY id DESC LIMIT 200", *args)
     out = []
@@ -328,7 +345,7 @@ def list_requests(user: str = "", after: int = 0, viewer=Depends(managing)):
             "priv": d1["privileged"] if d1 else None, "judg": d1["judgment"] if d1 else None,
         })
     latest = db.one(f"SELECT MAX(id) id FROM requests WHERE source='chat' AND {scope}", *ids)
-    return {"requests": out, "latest_chat": latest["id"] if latest else None}
+    return {"requests": out, "total": total, "latest_chat": latest["id"] if latest else None}
 
 
 @app.get("/api/requests/{rid}")

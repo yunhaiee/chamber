@@ -109,7 +109,7 @@ Stay on **Daniel Osei**. On the Board, click **Run the firm's day**.
 
 Give it about 30 seconds.
 
-**You should see:** Daniel's **Public fee or limit** is **Cloud**. Tap **Maya Chen** at the top: hers is **On device**. The numbers at the top are moving.
+**You should see:** in the grid at the bottom of the Board, Daniel's **Public fee or limit** is **Cloud** and Maya's is **On device**. The bands and numbers are moving. Click a band to open the requests behind it.
 
 **Say:** "Same task, different result. Maya checks a claim against one limit. Daniel works out an executor's fee across three tiers, and this small model gets that math wrong. Nobody wrote that rule. The results did. And every call that moved on device is a cloud call the firm doesn't pay for, and it's faster."
 

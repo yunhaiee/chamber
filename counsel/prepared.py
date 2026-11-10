@@ -48,6 +48,8 @@ LABELS = {
     "compute_distribution": "Compute distributions",
     "draft_client_letter": "Draft a client letter",
     "other": "Other work",
+    "wall": "Refused: another matter",
+    "privacy_rule": "Masking request",
 }
 RESEARCH_LABEL = {"maya": "Research: civil procedure", "daniel": "Research: probate"}
 

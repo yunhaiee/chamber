@@ -164,3 +164,33 @@ def test_supervisor_follows_the_hierarchy(firm_of_three):
     assert accounts.supervisor(worker)["id"] == p["manager_id"]
     assert accounts.supervisor(manager)["id"] == head["id"]
     assert accounts.supervisor(head) is None
+
+
+def _request(user, kind, dest, status="done"):
+    return db.run("INSERT INTO requests (user, source, text, status, destination, kind, ts) VALUES (?,?,?,?,?,?,?)", user, "chat", "text", status, dest, kind, db.now())
+
+
+def test_flow_counts_match_the_requests_they_open(firm_of_three):
+    client, p = firm_of_three
+    for _ in range(3):
+        _request(p["worker_id"], "public_research", "claude")
+    _request(p["worker_id"], "public_research", "box")
+    _request(p["worker_id"], "advice", "lawyer")
+    _request(p["worker_id"], "public_research", None, status="working")
+    flow = client.get("/api/board", headers=p["head"]).json()["flow"]
+    band = next(r for r in flow if r["kind"] == "public_research" and r["dest"] == "claude")
+    assert band["n"] == 3 and sum(r["n"] for r in flow) == 5
+    opened = client.get("/api/requests", headers=p["head"], params={"user": p["worker_id"], "kind": "public_research", "dest": "claude"}).json()
+    assert opened["total"] == 3 and len(opened["requests"]) == 3
+    assert {r["destination"] for r in opened["requests"]} == {"claude"}
+
+
+def test_flow_shows_a_manager_only_their_people_and_never_text(firm_of_three):
+    client, p = firm_of_three
+    _request(p["other_id"], "public_research", "claude")
+    _request(p["worker_id"], "advice", "lawyer")
+    flow = client.get("/api/board", headers=p["manager"]).json()["flow"]
+    assert {r["user"] for r in flow} == {p["worker_id"]}
+    assert set(flow[0]) == {"user", "kind", "dest", "n"}
+    outside = client.get("/api/requests", headers=p["manager"], params={"user": p["other_id"]}).json()
+    assert outside["total"] == 0

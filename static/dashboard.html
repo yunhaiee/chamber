@@ -10,11 +10,16 @@ const TABS = [['board', 'Board'], ['requests', 'Requests'], ['masking', 'Masking
 const ROLE_WORD = { head: 'Head of firm', manager: 'Manager', employee: 'Employee' };
 const DEST_WORD = { box: 'On device', claude: 'Cloud', lawyer: 'Human', blocked: 'Blocked' };
 const TYPE_CLASS = { Testing: 'testing', 'On device': 'box', Cloud: 'claude', Human: 'lawyer' };
-const ui = { people: [], boardPerson: null, tab: 'board', expanded: new Set(), types: null, selected: null, pinned: false, person: '', seenMask: null, last: {} };
+const ROUTES = [
+  { id: 'box', word: 'On device' }, { id: 'claude', word: 'Cloud, names masked' },
+  { id: 'lawyer', word: 'Human' }, { id: 'blocked', word: 'Blocked' },
+];
+const NO_FILTER = { user: '', kind: '', dest: '' };
+const ui = { people: [], tasks: {}, kinds: [], boardPerson: null, flowBy: 'person', tab: 'board', types: null, selected: null, pinned: false, autoPick: false, filter: { ...NO_FILTER }, seenMask: null, last: {} };
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function shell() {
-  root.innerHTML = `<div class="top">${BRAND}<span id="tabs"></span>${EMBEDDED ? '' : '<nav class="topnav"><a href="/">Chat</a><button type="button" id="signout">Sign out</button></nav>'}</div><main id="main"></main>`;
+  root.innerHTML = `<div class="top">${BRAND}<span id="tabs"></span>${EMBEDDED ? '' : '<nav class="topnav"><a href="/">Chat</a><button type="button" id="signout">Sign out</button></nav>'}</div><main id="main"></main><div id="tip" role="status"></div>`;
   document.getElementById('signout')?.addEventListener('click', signOut);
   renderTabs();
 }
@@ -23,7 +28,26 @@ function renderTabs() {
   el.innerHTML = TABS.map(([id, name]) => `<button class="tab ${ui.tab === id ? 'on' : ''}" data-tab="${id}">${name}</button>`).join('');
   el.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
 }
-function go(tab) { ui.tab = tab; ui.last = {}; renderTabs(); document.getElementById('main').innerHTML = ''; tick(); }
+function go(tab) {
+  if (tab === 'requests') ui.filter = { ...NO_FILTER };
+  ui.tab = tab; ui.last = {}; hideTip(); renderTabs(); document.getElementById('main').innerHTML = ''; tick();
+}
+
+// A band, label or cell on the Board opens the requests behind it, with the newest one already open.
+function openRequests(filter) {
+  ui.filter = { ...NO_FILTER, ...filter };
+  ui.selected = null; ui.pinned = false; ui.autoPick = true;
+  go2Requests();
+}
+function go2Requests() { ui.tab = 'requests'; ui.last = {}; hideTip(); renderTabs(); document.getElementById('main').innerHTML = ''; tick(); }
+
+function showTip(ev, text) {
+  const tip = document.getElementById('tip');
+  tip.textContent = text; tip.style.display = 'block';
+  tip.style.left = Math.min(ev.clientX + 14, innerWidth - 270) + 'px';
+  tip.style.top = ev.clientY + 14 + 'px';
+}
+function hideTip() { const tip = document.getElementById('tip'); if (tip) tip.style.display = 'none'; }
 
 function strikes(score, needed) {
   const marks = (score ? score.marks : []).map(ok => `<span class="dot ${ok ? 'pass' : 'miss'}"></span>`);
@@ -33,44 +57,121 @@ function strikes(score, needed) {
 
 function scoreText(score) { return score && score.total ? `${score.right} of ${score.total} right` : 'not tested yet'; }
 
-function expandedHtml(r) {
+function cellTip(r) {
   if (r.type === 'Human') return 'No model answers this. A human decides.';
-  if (r.state === 'LOCAL') return `Stays on device &nbsp;·&nbsp; Cloud never sent &nbsp;·&nbsp; ${esc(r.model)}`;
-  const cloud = r.cloud ? `Cloud ${scoreText(r.cloud)}` : 'Cloud never sent';
+  if (r.state === 'LOCAL') return 'Stays on device. Never sent to the cloud.';
   const t = v => v ? ` (${(v / 1000).toFixed(1)}s median)` : '';
-  return `On device ${scoreText(r.local)}${t(r.device_ms)} &nbsp;·&nbsp; ${cloud}${r.cloud ? t(r.cloud_ms) : ''} &nbsp;·&nbsp; ${esc(r.model)}`;
+  return `On device ${scoreText(r.local)}${t(r.device_ms)}. ${r.cloud ? `Cloud ${scoreText(r.cloud)}${t(r.cloud_ms)}.` : 'Never sent to the cloud.'}`;
 }
 
-window.setBoardPerson = person => { ui.boardPerson = person; ui.last = {}; tick(); };
+window.setBoardPerson = person => { ui.boardPerson = person; ui.last.board = null; tick(); };
+
+const goAttr = filter => `data-go="${esc(JSON.stringify(filter))}"`;
+const plural = n => `${n} request${n === 1 ? '' : 's'}`;
+
+function flowHtml(data, rows, totals) {
+  const byPerson = ui.flowBy === 'person';
+  const field = byPerson ? 'user' : 'kind';
+  const names = Object.fromEntries(data.people.map(p => [p.user, p.name]));
+  const sum = list => list.reduce((a, r) => a + r.n, 0);
+  const left = [...new Set(rows.map(r => r[field]))].sort((a, b) => byPerson
+    ? data.people.findIndex(p => p.user === a) - data.people.findIndex(p => p.user === b)
+    : sum(rows.filter(r => r.kind === b)) - sum(rows.filter(r => r.kind === a)));
+  const nameOf = v => byPerson ? names[v] : (data.tasks[v] || v);
+  const routes = ROUTES.map((route, i) => ({ ...route, total: totals[i] })).filter(r => r.total);
+  const W = Math.max(320, document.getElementById('main').clientWidth - 48);
+  const narrow = W < 620, GAP = 14, BAR = 5;
+  const X0 = narrow ? 112 : 186, X1 = W - (narrow ? 100 : 206), H = Math.max(240, left.length * 46);
+  const trim = t => { const max = narrow ? 13 : 26; return t.length > max ? t.slice(0, max - 1) + '…' : t; };
+  const total = sum(rows);
+  const unit = (H - 20 - GAP * Math.max(left.length - 1, routes.length - 1)) / total;
+  const stack = heights => { const used = heights.reduce((a, b) => a + b, 0) + GAP * (heights.length - 1); let y = (H - used) / 2; return heights.map(h => { const at = y; y += h + GAP; return at; }); };
+  const cell = (l, route) => sum(rows.filter(r => r[field] === l && r.dest === route.id));
+  const leftH = left.map(l => sum(rows.filter(r => r[field] === l)) * unit);
+  const rightH = routes.map(r => r.total * unit);
+  const leftY = stack(leftH), rightY = stack(rightH), rightCursor = [...rightY];
+  const paint = { box: 'fill="#000" fill-opacity=".2"', claude: 'fill="#9b9b9b" fill-opacity=".3"', lawyer: 'fill="url(#flowhatch)" fill-opacity=".4"', blocked: 'fill="#fff" stroke="#000"' };
+  let bands = '';
+  left.forEach((l, i) => {
+    let cursor = leftY[i];
+    routes.forEach((route, r) => {
+      const c = cell(l, route);
+      if (!c) return;
+      const h = c * unit, ya = cursor, yb = rightCursor[r], mx = (X0 + X1) / 2;
+      cursor += h; rightCursor[r] += h;
+      const d = `M${X0} ${ya}C${mx} ${ya} ${mx} ${yb} ${X1} ${yb}L${X1} ${yb + h}C${mx} ${yb + h} ${mx} ${ya + h} ${X0} ${ya + h}Z`;
+      const label = `${nameOf(l)}: ${plural(c)} went to ${route.word.toLowerCase()}. Click to open.`;
+      bands += `<g class="flow-band" tabindex="0" role="link" aria-label="${esc(label)}" data-tip="${esc(label)}" ${goAttr({ [field]: l, dest: route.id })}><path ${paint[route.id]} d="${d}"/><path class="hit" d="${d}" stroke-width="${Math.max(10 - h, 0)}"/></g>`;
+    });
+  });
+  const leftMarks = left.map((l, i) => {
+    const label = `${nameOf(l)}: open all ${plural(sum(rows.filter(r => r[field] === l)))}`;
+    return `<g class="flow-end" tabindex="0" role="link" aria-label="${esc(label)}" data-tip="${esc(label)}" ${goAttr({ [field]: l })}><text x="${X0 - 14}" y="${leftY[i] + leftH[i] / 2 + 5}" text-anchor="end" font-size="14">${esc(trim(nameOf(l)))}</text><rect x="${X0 - BAR}" y="${leftY[i]}" width="${BAR}" height="${Math.max(leftH[i], 3)}" rx="2"/></g>`;
+  }).join('');
+  const rightMarks = routes.map((route, r) => {
+    const label = `${route.word}: open all ${plural(route.total)}`;
+    return `<g class="flow-end" tabindex="0" role="link" aria-label="${esc(label)}" data-tip="${esc(label)}" ${goAttr({ dest: route.id })}><rect x="${X1}" y="${rightY[r]}" width="${BAR}" height="${Math.max(rightH[r], 3)}" rx="2"/><text x="${X1 + 16}" y="${rightY[r] + rightH[r] / 2 + 6}" font-size="14"><tspan font-size="20" font-weight="300" letter-spacing="-.5">${route.total}</tspan><tspan dx="7">${narrow ? route.word.split(',')[0] : route.word}</tspan></text></g>`;
+  }).join('');
+  return `<svg class="flow" viewBox="0 0 ${W} ${H}" width="100%" role="group" aria-label="Where work went"><defs><pattern id="flowhatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#fff"/><rect width="2" height="6" fill="#000"/></pattern></defs>${bands}${leftMarks}${rightMarks}</svg>`;
+}
+
+function shareHtml(totals, total) {
+  const live = ROUTES.map((route, i) => ({ ...route, n: totals[i] })).filter(r => r.n);
+  return `<div class="share">${live.map(r => `<button class="seg seg-${r.id}" style="flex:${r.n}" aria-label="Open ${esc(r.word)}" data-tip="${esc(`${r.word}: ${plural(r.n)}. Click to open.`)}" ${goAttr({ dest: r.id })}></button>`).join('')}</div>
+    <div class="sharelabels">${live.map(r => `<button ${goAttr({ dest: r.id })}><i class="seg seg-${r.id}"></i><b>${Math.round(r.n / total * 100)}%</b>${r.word}</button>`).join('')}</div>`;
+}
+
+function gridHtml(data, rows) {
+  const known = ui.types;
+  ui.types = new Map();
+  const kinds = [...new Set(data.people.flatMap(p => p.rows.map(r => r.kind)))];
+  if (!kinds.length) return '';
+  const count = (user, kind) => rows.filter(r => r.user === user && r.kind === kind).reduce((a, r) => a + r.n, 0);
+  const head = data.people.map(p => `<th class="${EMBEDDED && p.user === ui.boardPerson ? 'on' : ''}"><button class="linkish" ${goAttr({ user: p.user })}>${esc(p.name)}</button></th>`).join('');
+  const body = kinds.map(kind => `<tr><td><button class="linkish" ${goAttr({ kind })}>${esc(data.tasks[kind] || kind)}</button></td>${data.people.map(p => {
+    const r = p.rows.find(x => x.kind === kind);
+    if (!r) return '<td></td>';
+    const id = `${p.user}/${kind}`;
+    ui.types.set(id, r.type);
+    const fresh = known && known.has(id) && known.get(id) !== r.type;
+    const n = count(p.user, kind);
+    return `<td><button class="cellbtn ${fresh ? 'flash' : ''}" data-tip="${esc(`${p.name}, ${data.tasks[kind] || kind}. ${cellTip(r)}`)}" ${goAttr({ user: p.user, kind })}><span class="state ${TYPE_CLASS[r.type]}">${r.type}</span>${n ? `<span class="count">${n}</span>` : ''}${r.type === 'Testing' ? strikes(r.local, r.needed) : ''}</button></td>`;
+  }).join('')}</tr>`).join('');
+  return `<div class="tablewrap"><table class="routegrid"><tr><th>Task</th>${head}</tr>${body}</table></div>`;
+}
 
 function renderBoard(data) {
   const main = document.getElementById('main');
-  const known = ui.types;
-  ui.types = new Map();
-  ui.people = data.people;
+  hideTip();
   if (!data.people.some(p => p.user === ui.boardPerson)) ui.boardPerson = data.people[0]?.user;
+  const shown = new Set(data.people.map(p => p.user));
+  const rows = data.flow.filter(r => shown.has(r.user));
+  const totals = ROUTES.map(route => rows.filter(r => r.dest === route.id).reduce((a, r) => a + r.n, 0));
+  const total = totals.reduce((a, b) => a + b, 0);
   const sv = data.savings;
   const secs = ms => ms ? `${(ms / 1000).toFixed(1)}s` : '-';
-  main.innerHTML = `<div class="stats"><div><b>${sv.avoided}</b><span>cloud calls avoided</span></div><div><b>${secs(sv.device_ms)}</b><span>on device</span></div><div><b>${secs(sv.cloud_ms)}</b><span>cloud</span></div>${data.demo ? `<button class="runday" id="runday">${data.runs.day.running ? 'Running…' : 'Run the firm\'s day'}</button>` : ''}</div>` + (EMBEDDED ? '' : `<div><div class="switch">${data.people.map(p => `<button class="${p.user === ui.boardPerson ? 'on' : ''}" data-person="${p.user}">${esc(p.name)}</button>`).join('')}</div></div>`) + data.people.filter(p => p.user === ui.boardPerson).map(p => `<section class="band"><div class="bandhead">${esc(p.name)}<span class="muted">${esc(p.model)}</span></div>
-    <table class="board"><tr class="eyebrow"><th>Task</th><th>Type</th></tr>
-    ${p.rows.map(r => {
-      const id = `${p.user}/${r.kind}`;
-      ui.types.set(id, r.type);
-      const open = ui.expanded.has(id);
-      const fresh = known && known.has(id) && known.get(id) !== r.type;
-      const typeCell = r.type === 'Testing'
-        ? `<span class="state testing">Testing</span><span class="strike">On device ${strikes(r.local, r.needed)}</span><span class="strike">Cloud ${strikes(r.cloud, r.needed)}</span>`
-        : `<span class="state ${TYPE_CLASS[r.type]}">${r.type}</span>`;
-      return `<tr class="pick ${fresh ? 'flash' : ''}" data-row="${id}"><td>${open ? '▾' : '▸'} ${esc(r.label)}</td><td>${typeCell}</td></tr>
-        ${open ? `<tr><td colspan="2" class="muted">${expandedHtml(r)}</td></tr>` : ''}`;
-    }).join('')}</table>${p.rows.length ? '' : '<div class="muted empty-note">No work yet.</div>'}</section>`).join('');
-  main.querySelectorAll('[data-person]').forEach(b => b.onclick = () => window.setBoardPerson(b.dataset.person));
+  const stats = `<div class="stats"><div><b>${sv.avoided}</b><span>cloud calls avoided</span></div><div><b>${secs(sv.device_ms)}</b><span>on device</span></div><div><b>${secs(sv.cloud_ms)}</b><span>cloud</span></div>${data.demo ? `<button class="runday" id="runday">${data.runs.day.running ? 'Running…' : 'Run the firm\'s day'}</button>` : ''}</div>`;
+  const toggle = `<div class="toggle">${[['person', 'By person'], ['task', 'By task']].map(([id, word]) => `<button class="${ui.flowBy === id ? 'on' : ''}" data-flowby="${id}">${word}</button>`).join('')}</div>`;
+  main.innerHTML = stats + (total
+    ? `<section class="boardsec"><div class="sechead"><h2>Where work went</h2>${toggle}</div>${flowHtml(data, rows, totals)}</section>
+       <section class="boardsec"><h2>Share of all requests</h2>${shareHtml(totals, total)}</section>`
+    : '<div class="muted empty-note">No requests yet. They\'ll appear here as people use Chamber.</div>')
+    + (gridHtml(data, rows) ? `<section class="boardsec"><h2>Where each task runs today</h2>${gridHtml(data, rows)}</section>` : '');
   document.getElementById('runday')?.addEventListener('click', () => post('/api/day/start'));
-  main.querySelectorAll('[data-row]').forEach(el => el.onclick = () => {
-    const id = el.dataset.row;
-    ui.expanded.has(id) ? ui.expanded.delete(id) : ui.expanded.add(id);
-    ui.last.board = null;
-    tick();
+  main.querySelectorAll('[data-flowby]').forEach(b => b.onclick = () => { ui.flowBy = b.dataset.flowby; ui.last.board = null; tick(); });
+  main.querySelectorAll('[data-go]').forEach(el => {
+    const open = () => openRequests(JSON.parse(el.dataset.go));
+    el.onclick = open;
+    if (el.tagName.toLowerCase() === 'g') el.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); } };
+  });
+  const flow = main.querySelector('.flow');
+  main.querySelectorAll('[data-tip]').forEach(el => {
+    el.onmousemove = ev => showTip(ev, el.dataset.tip);
+    el.onmouseleave = hideTip;
+  });
+  main.querySelectorAll('.flow-band').forEach(band => {
+    band.onmouseenter = () => { band.classList.add('hot'); flow.classList.add('dim'); };
+    band.onmouseleave = () => { band.classList.remove('hot'); flow.classList.remove('dim'); hideTip(); };
   });
 }
 
@@ -95,15 +196,33 @@ async function renderDetail(id) {
   holder.innerHTML = `<div class="detail">${columnHtml('On device', data.box, 'box')}<div>${columnHtml('Cloud', data.cloud, 'cloud')}${cloudExtra}</div></div>`;
 }
 
+function setFilterOptions(id, options, value) {
+  const select = document.getElementById(id);
+  select.innerHTML = `<option value="">All</option>${options.map(([v, word]) => `<option value="${esc(v)}">${esc(word)}</option>`).join('')}`;
+  select.value = value;
+}
+
 function renderRequests(data) {
   const main = document.getElementById('main');
   if (!document.getElementById('reqs')) {
-    main.innerHTML = `<div class="filters"><span class="eyebrow">Person</span><select id="person"><option value="">All</option>${ui.people.map(p => `<option value="${esc(p.user)}">${esc(p.name)}</option>`).join('')}</select></div><div id="reqs"></div><div id="detail"></div>`;
-    document.getElementById('person').onchange = ev => { ui.person = ev.target.value; ui.last = {}; tick(); };
+    main.innerHTML = `<div class="filters"><span class="eyebrow">Person</span><select id="fuser" aria-label="Person"></select><span class="eyebrow">Task</span><select id="fkind" aria-label="Task"></select><span class="eyebrow">Where</span><select id="fdest" aria-label="Where"></select><button class="linkish muted" id="fclear" hidden>Clear filters</button><span class="muted" id="fcount"></span></div><div id="reqs"></div><div id="detail"></div>`;
+    [['fuser', 'user'], ['fkind', 'kind'], ['fdest', 'dest']].forEach(([id, field]) => {
+      document.getElementById(id).onchange = ev => { ui.filter[field] = ev.target.value; ui.selected = null; ui.pinned = false; ui.autoPick = true; ui.last = {}; tick(); };
+    });
+    document.getElementById('fclear').onclick = () => { ui.filter = { ...NO_FILTER }; ui.selected = null; ui.pinned = false; ui.last = {}; tick(); };
   }
-  document.getElementById('person').value = ui.person;
-  document.getElementById('reqs').innerHTML = `<table><tr><th>Task</th><th>Who</th><th>Where</th></tr>
-    ${data.requests.filter(r => r.status !== 'working').slice(0, 30).map(r => `<tr class="pick ${r.id === ui.selected ? 'chosen' : ''}" data-id="${r.id}"><td>${esc(r.label)}</td><td>${esc(r.name.split(' ')[0])}</td><td>${destHtml(r.destination)}</td></tr>`).join('')}</table>`;
+  if (ui.autoPick) {
+    ui.autoPick = false;
+    if (data.requests.length) { ui.selected = data.requests[0].id; ui.pinned = true; ui.last.detail = null; }
+  }
+  setFilterOptions('fuser', ui.people.map(p => [p.user, p.name]), ui.filter.user);
+  setFilterOptions('fkind', ui.kinds.map(k => [k, ui.tasks[k] || k]), ui.filter.kind);
+  setFilterOptions('fdest', ROUTES.map(r => [r.id, r.word]), ui.filter.dest);
+  document.getElementById('fclear').hidden = !(ui.filter.user || ui.filter.kind || ui.filter.dest);
+  document.getElementById('fcount').textContent = data.total > data.requests.length ? `Newest ${data.requests.length} of ${data.total.toLocaleString()}` : plural(data.total);
+  document.getElementById('reqs').innerHTML = data.requests.length
+    ? `<table><tr><th>Task</th><th>Who</th><th>Where</th></tr>${data.requests.map(r => `<tr class="pick ${r.id === ui.selected ? 'chosen' : ''}" data-id="${r.id}"><td>${esc(r.label)}</td><td>${esc(r.name.split(' ')[0])}</td><td>${destHtml(r.destination)}</td></tr>`).join('')}</table>`
+    : '<div class="muted empty-note">No requests match these filters.</div>';
   document.querySelectorAll('tr.pick').forEach(tr => tr.onclick = () => { ui.selected = Number(tr.dataset.id); ui.pinned = true; ui.last.detail = null; tick(); });
   if (!ui.pinned && data.latest_chat && data.latest_chat !== ui.selected && data.latest_chat !== ui.closedAt) ui.selected = data.latest_chat;
 }
@@ -245,9 +364,11 @@ function changed(name, value) {
 async function tick() {
   try {
     const board = await api('/api/board');
-    if (ui.tab === 'board' && changed('board', [board.people, board.savings, board.runs.day.running])) renderBoard(board);
+    ui.people = board.people; ui.tasks = board.tasks; ui.kinds = [...new Set(board.flow.map(r => r.kind))];
+    if (ui.tab === 'board' && changed('board', [board.people, board.flow, board.savings, board.runs.day.running])) renderBoard(board);
     if (ui.tab === 'requests') {
-      const data = await api(`/api/requests${ui.person ? `?user=${ui.person}` : ''}`);
+      const query = new URLSearchParams(Object.entries(ui.filter).filter(([, v]) => v));
+      const data = await api(`/api/requests?${query}`);
       if (changed('requests', [data, ui.selected])) renderRequests(data);
       if (ui.selected && changed('detail', [ui.selected, data.requests.find(r => r.id === ui.selected)])) await renderDetail(ui.selected);
     }

@@ -118,7 +118,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .switch { display: inline-flex; gap: 2px; }
 .switch button { padding: 5px 16px; border-radius: var(--bar); font-size: 13.5px; color: var(--muted); }
 .switch button:hover { color: var(--ink); }
-.switch button.on { background: var(--ink); color: var(--bg); font-weight: 500; }
+.switch button.on { color: var(--ink); font-weight: 700; }
 
 /* dashboard */
 .top { display: flex; gap: 20px; align-items: center; padding: 14px 24px; flex-wrap: wrap; }
@@ -129,16 +129,12 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .tab { color: var(--muted); padding: 4px 10px; border-radius: var(--bar); font-size: 13.5px; }
 .tab:hover { color: var(--ink); }
 .tab.on { color: var(--ink); background: var(--bg-2); font-weight: 500; }
-main .switch button.on { background: var(--bg-2); color: var(--ink); }
 main { padding: 12px 24px 40px; display: flex; flex-direction: column; gap: 22px; }
 .runday { margin-left: auto; background: var(--bg-2); border-radius: var(--bar); padding: 8px 16px; font-size: 13.5px; font-weight: 500; }
 .runday:hover, .ruleform button:hover, .personform button:hover { background: var(--line); }
 .stats { display: flex; gap: 36px; align-items: baseline; flex-wrap: wrap; }
 .stats b { font-size: 40px; font-weight: 300; line-height: 1.1; letter-spacing: -.04em; margin-right: 8px; }
 .stats span { color: var(--muted); font-size: 13px; }
-.band { border-top: 1px solid var(--ink); padding-top: 12px; }
-.bandhead { font-size: 15px; font-weight: 500; }
-.bandhead .muted { font-size: 12.5px; font-weight: 400; margin-left: 10px; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th { text-align: left; font-weight: 400; color: var(--muted); font-size: 12.5px; }
 th, td { padding: 8px 14px 8px 0; vertical-align: middle; }
@@ -151,10 +147,6 @@ tr.pick td:first-child { padding-left: 4px; }
 .dot.pass { background: var(--ink); box-shadow: none; }
 .dot.miss { box-shadow: inset 0 0 0 1px var(--ink); background: repeating-linear-gradient(135deg, var(--ink) 0 1px, transparent 1px 3px); }
 .state, td .dest { white-space: nowrap; }
-.strike { margin-left: 16px; font-size: 12.5px; color: var(--muted); }
-.strike .dots { margin-left: 5px; vertical-align: 1px; }
-table.board { margin-top: 8px; }
-table.board td:first-child, table.board th:first-child { width: 42%; }
 .detail { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .detail > div { border-top: 1px solid var(--ink); padding-top: 10px; }
 .detail h3 { margin: 0 0 8px; font: inherit; font-weight: 500; font-size: 15px; }
@@ -180,6 +172,46 @@ table.board td:first-child, table.board th:first-child { width: 42%; }
 table.people select { padding: 3px 6px; }
 @media (max-width: 760px) { .personform { grid-template-columns: 1fr 1fr; } }
 
+/* Board: where work goes */
+main .dest.box, main .state.box { background: #e2e2e2; color: var(--ink); }
+main .state.testing { background: none; color: var(--muted); padding-left: 0; }
+.boardsec { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.boardsec h2 { font-size: 15px; font-weight: 500; margin: 0; }
+.sechead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.toggle { display: inline-flex; gap: 2px; }
+.toggle button { font-size: 13px; color: var(--muted); padding: 3px 11px; border-radius: var(--bar); }
+.toggle button.on { background: var(--bg-2); color: var(--ink); font-weight: 500; }
+.flow { display: block; }
+.flow text { font-family: inherit; fill: var(--ink); }
+.flow-band, .flow-end { cursor: pointer; outline: 0; }
+.flow-band { transition: opacity .12s; }
+.flow-band .hit { fill: transparent; stroke: transparent; }
+.flow.dim .flow-band:not(.hot) { opacity: .3; }
+.flow-band:focus-visible path:first-child { stroke: var(--ink); stroke-width: 1.5; }
+.flow-end rect { fill: var(--ink); }
+.flow-end:hover text, .flow-end:focus-visible text { text-decoration: underline; }
+.share { display: flex; gap: 2px; height: 8px; }
+.seg { display: block; border-radius: 3px; }
+.seg-box { background: var(--ink); }
+.seg-claude { background: #9b9b9b; }
+.seg-lawyer { background: repeating-linear-gradient(135deg, var(--ink) 0 1.5px, var(--bg) 1.5px 4px); }
+.seg-blocked { background: var(--bg); box-shadow: inset 0 0 0 1px var(--ink); min-width: 8px; }
+.sharelabels { display: flex; gap: 22px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.sharelabels button { display: inline-flex; align-items: center; color: inherit; }
+.sharelabels button:hover { color: var(--ink); }
+.sharelabels .seg { width: 16px; height: 8px; margin-right: 7px; }
+.sharelabels b { color: var(--ink); font-weight: 500; font-size: 15px; margin-right: 5px; }
+.tablewrap { overflow-x: auto; }
+.routegrid th.on .linkish { font-weight: 500; color: var(--ink); }
+.routegrid th .linkish { color: var(--muted); font-size: 12.5px; }
+.routegrid td:first-child { white-space: nowrap; }
+.linkish:hover { text-decoration: underline; text-underline-offset: 3px; }
+.cellbtn { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 4px 2px 0; }
+.cellbtn:hover .state { box-shadow: inset 0 0 0 1px var(--ink); }
+.count { color: var(--muted); font-size: 12.5px; }
+.dots { margin-left: 2px; }
+#tip { position: fixed; z-index: 10; display: none; max-width: 260px; background: var(--bg); border: 1px solid var(--ink); border-radius: 10px; padding: 6px 10px; font-size: 13px; pointer-events: none; }
+
 /* The one animated moment: a task earns its place and the bar is drawn across it. */
 .flash { animation: flash 2.5s ease-out; }
 @keyframes flash { from { background: var(--line); } to { background: transparent; } }
@@ -194,8 +226,6 @@ table.people select { padding: 3px 6px; }
   .detail { grid-template-columns: 1fr; }
   .stats { gap: 18px; }
   .stats b { font-size: 28px; }
-  .strike { display: block; margin: 3px 0 0; }
-  table.board td:first-child, table.board th:first-child { width: 50%; }
 }
 @media (max-width: 480px) {
   .pair { grid-template-columns: 1fr; }
