@@ -9,7 +9,7 @@ const ATTACKS = [
   ["Fake system notes and fake approvals", "Claims that a system or a managing partner has cleared the text for sending."],
   ["Claiming the text is public", "Privileged content labeled as a public record."],
   ["Burying it in public text", "A privileged passage hidden inside an ordinary research question."],
-  ["Encoded text", "Base64, hex, rot13, reversed and spaced-out text. d1 can't read these, so a fixed rule keeps unreadable text on device."],
+  ["Encoded text", "Base64, hex, rot13, reversed and spaced-out text. the decision model can't read these, so a fixed rule keeps unreadable text on device."],
 ];
 
 export default function Security() {
@@ -36,8 +36,8 @@ export default function Security() {
       <section className="section">
         <h2>Fixed rules back up the model.</h2>
         <div className="grid2">
-          <div><b>Files stay</b><span>An attached client file stays on device, whatever d1 scores.</span></div>
-          <div><b>If in doubt, keep it</b><span>If d1 is unavailable or the text can&apos;t be read, the work stays on device.</span></div>
+          <div><b>Files stay</b><span>An attached client file stays on device, whatever the decision model scores.</span></div>
+          <div><b>If in doubt, keep it</b><span>If the decision model is unavailable or the text can&apos;t be read, the work stays on device.</span></div>
           <div><b>No masking, no call</b><span>If the masking step fails, the cloud call is blocked.</span></div>
           <div><b>Employees can&apos;t switch it off</b><span>Only managers can change the firm&apos;s masking.</span></div>
           <div><b>Walls between lawyers</b><span>The server keeps each lawyer to their own matters. Asking for another matter&apos;s file gets the same reply as a file that doesn&apos;t exist.</span></div>
@@ -61,7 +61,7 @@ export default function Security() {
         <h2>What this doesn&apos;t do.</h2>
         <div className="grid2">
           <div><b>The leak test has limits</b><span>It catches exact client names, secrets, emails and runs of 8 words from a document. A paraphrase would get past it.</span></div>
-          <div><b>d1 can misjudge</b><span>Thresholds lean toward privileged, and fixed rules back it up. This reduces risk and doesn&apos;t remove it.</span></div>
+          <div><b>The decision model can misjudge</b><span>Thresholds lean toward privileged, and fixed rules back it up. This reduces risk and doesn&apos;t remove it.</span></div>
           <div><b>Network access needs HTTPS</b><span>By default the app only listens on its own machine. Put HTTPS in front before opening it to an office.</span></div>
           <div><b>It doesn&apos;t replace your obligations</b><span>Chamber isn&apos;t legal advice and doesn&apos;t replace a firm&apos;s ethics obligations.</span></div>
         </div>

@@ -7,8 +7,8 @@ type Preset = { id: string; ask: string; hint: string; legal: boolean; priv: boo
 const PRESETS: Preset[] = [
   { id: "docket", ask: "What is the next hearing date on this public docket?", hint: "Public lookup", legal: false, priv: false },
   { id: "research", ask: "What's the limit for fraud? Harlow Orchards asked.", hint: "Public research that names a client", legal: false, priv: false, masked: "What's the limit for fraud? [CLIENT_1] asked." },
-  { id: "file", ask: "Summarize this deposition.", hint: "Client file attached", legal: false, priv: true, why: "A fixed rule: an attached client file stays on device, whatever d1 scores." },
-  { id: "email", ask: "What's the deadline? Here is our client's email: please keep this between us.", hint: "Client email pasted into a question", legal: false, priv: true, why: "d1 flags the pasted client email as privileged." },
+  { id: "file", ask: "Summarize this deposition.", hint: "Client file attached", legal: false, priv: true, why: "A fixed rule: an attached client file stays on device, whatever the decision model scores." },
+  { id: "email", ask: "What's the deadline? Here is our client's email: please keep this between us.", hint: "Client email pasted into a question", legal: false, priv: true, why: "The decision model flags the pasted client email as privileged." },
   { id: "advice", ask: "Should we accept Brightline's offer?", hint: "A legal decision", legal: true, priv: false },
 ];
 
@@ -20,7 +20,7 @@ export default function RouteSimulator() {
   const [shown, setShown] = useState(0);
   const preset = PRESETS.find((p) => p.id === id)!;
 
-  const steps: Step[] = [{ q: "d1 reads the request on your device" }, { q: "Is it a legal decision?", a: preset.legal ? "Yes" : "No" }];
+  const steps: Step[] = [{ q: "The decision model reads the request on your device" }, { q: "Is it a legal decision?", a: preset.legal ? "Yes" : "No" }];
   if (!preset.legal) {
     steps.push({ q: "Is it privileged?", a: preset.priv ? "Yes" : "No", why: preset.why });
     if (!preset.priv) steps.push({ q: "Has this task earned its place on device?", a: earned ? "Yes" : "No" });

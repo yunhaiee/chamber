@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 
-type Node = { id: string; label: string; sub?: string; x: number; y: number; kind: string };
+type Node = { id: string; label: string; sub?: string; x: number; y: number; kind: string; w?: number };
 type Scene = { text: string; masked?: string; note: string; path: string[] };
 
 const SCENES: Scene[] = [
@@ -17,7 +17,7 @@ const WIDE = {
   w: 1120, h: 340, nw: 150, nh: 60, tall: false,
   nodes: [
     { id: "req", label: "A request", x: 80, y: 170, kind: "plain" },
-    { id: "d1", label: "d1 reads it", sub: "on your device", x: 300, y: 170, kind: "ask" },
+    { id: "d1", label: "Decision model", sub: "reads it on device", x: 300, y: 170, kind: "ask" },
     { id: "human", label: "Human", sub: "no AI answers", x: 610, y: 50, kind: "human" },
     { id: "local", label: "On device", sub: "a local model answers", x: 610, y: 170, kind: "solid" },
     { id: "mask", label: "Mask names", sub: "key stays here", x: 610, y: 290, kind: "plain" },
@@ -30,7 +30,7 @@ const TALL = {
   w: 400, h: 680, nw: 120, nh: 62, tall: true,
   nodes: [
     { id: "req", label: "A request", x: 200, y: 40, kind: "plain" },
-    { id: "d1", label: "d1 reads it", sub: "on your device", x: 200, y: 170, kind: "ask" },
+    { id: "d1", label: "Decision model", sub: "reads it on device", x: 200, y: 170, kind: "ask", w: 170 },
     { id: "human", label: "Human", sub: "no AI answers", x: 66, y: 340, kind: "human" },
     { id: "local", label: "On device", sub: "local model", x: 200, y: 340, kind: "solid" },
     { id: "mask", label: "Mask names", sub: "key stays here", x: 334, y: 340, kind: "plain" },
@@ -142,7 +142,7 @@ export default function HeroFlow({ onRoute }: { onRoute?: (dest: string) => void
           <span key={side.text} className="flow-side" style={{ top: `${(side.y / layout.h) * 100}%`, ...(side.right ? { right: `${100 - (side.x / layout.w) * 100}%` } : { left: `${(side.x / layout.w) * 100}%` }) }}>{side.text}</span>
         ))}
         {layout.nodes.map((n) => (
-          <div key={n.id} className={`flow-node ${n.kind}${live.node === n.id ? " hit" : ""}`} style={{ left: `${(n.x / layout.w) * 100}%`, top: `${(n.y / layout.h) * 100}%`, width: `${(layout.nw / layout.w) * 100}%`, height: `${(layout.nh / layout.h) * 100}%` }}>
+          <div key={n.id} className={`flow-node ${n.kind}${live.node === n.id ? " hit" : ""}`} style={{ left: `${(n.x / layout.w) * 100}%`, top: `${(n.y / layout.h) * 100}%`, width: `${((n.w ?? layout.nw) / layout.w) * 100}%`, height: `${(layout.nh / layout.h) * 100}%` }}>
             <b>{n.label}</b>{n.sub && <small>{n.sub}</small>}
           </div>
         ))}

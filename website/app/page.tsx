@@ -14,6 +14,20 @@ export default function Home() {
         <p className="prose">Firms want AI on their own machines because client files can&apos;t go to the cloud. A small local model can&apos;t do everything, so they need a hybrid. But what a small model can really do for a lawyer differs by firm and by role, and a fixed rule can only guess. Chamber measures it instead.</p>
       </section>
 
+      <section className="section" aria-labelledby="why">
+        <div className="intro">
+          <h2 id="why">Why firms hold back.</h2>
+          <p className="prose">Lawyers are taking up AI quickly. What holds them back is the two things Chamber is built around: answers they can trust, and client information that stays private.</p>
+        </div>
+        <div className="numbers">
+          <div><strong>30%</strong><p><b>of lawyers surveyed used AI in 2024</b>, up from 11% in 2023. The work is moving to AI whether or not a firm has a plan for it.</p></div>
+          <div><strong>75%</strong><p><b>named accuracy as their top concern.</b> So in Chamber, a local model has to prove each task before any work moves to it.</p></div>
+          <div><strong>47%</strong><p><b>named data privacy and security</b>, rising to 54% at firms of 100 or more lawyers. So privileged text stays on device, and cloud text is masked first.</p></div>
+        </div>
+        <p className="prose">The ethics rules point the same way. The ABA&apos;s 2024 opinion on generative AI says a lawyer generally needs the client&apos;s informed consent before putting client information into a self-learning AI tool, and a boilerplate clause in the engagement letter isn&apos;t enough.</p>
+        <p className="small">Sources: ABA 2024 Legal Technology Survey Report, 512 lawyers in private practice, as reported by <a className="textlink" href="https://www.lawnext.com/2025/03/aba-tech-survey-finds-growing-adoption-of-ai-in-legal-practice-with-efficiency-gains-as-primary-driver.html">LawNext</a> and the <a className="textlink" href="https://www.abajournal.com/web/article/aba-tech-report-finds-that-ai-adoption-is-growing-but-some-are-hesitant">ABA Journal</a> (March 2025). ABA Formal Opinion 512 (July 2024), summarized by the <a className="textlink" href="https://www.americanbar.org/groups/litigation/resources/newsletters/ethics-professionalism/generative-ai-lawyers-part-2-maintaining-confidentiality/">ABA Litigation Section</a>.</p>
+      </section>
+
       <section className="section">
         <div className="link-row">
           <Link href="/product/"><h3>It earns the work</h3><span>Local and cloud models answer side by side until the local model has proved itself, per person, per task, per model.</span><em>See how it decides</em></Link>

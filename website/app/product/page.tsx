@@ -11,7 +11,7 @@ export default function Product() {
     <div className="wrap stack">
       <header className="intro">
         <h1 className="page-title">Every request goes to the right place.</h1>
-        <p className="lede">Liquid&apos;s d1 model runs on the device and reads each request first. It decides whether the text is privileged, whether a person has to decide, and what kind of work it is.</p>
+        <p className="lede">A small decision model runs on the device and reads each request first. It decides whether the text is privileged, whether a person has to decide, and what kind of work it is.</p>
       </header>
 
       <section className="section">
@@ -20,13 +20,13 @@ export default function Product() {
           <p className="prose">Pick an example and watch the decision. Then turn on &quot;earned&quot; to see what changes once the local model has proved itself.</p>
         </div>
         <RouteSimulator />
-        <p className="small">A simulation of Chamber&apos;s routing rules, using example requests. In the app, d1 makes these calls on the real text.</p>
+        <p className="small">A simulation of Chamber&apos;s routing rules, using example requests. In the app, the decision model makes these calls on the real text.</p>
       </section>
 
       <section className="section">
         <h2>Five paths.</h2>
         <div className="rows">
-          <div className="row3"><span><span className="pill on">On device</span></span><b>Privileged work</b><span className="muted">Attached client files, marked text and anything d1 flags as privileged are answered on your machine. Text that can&apos;t be read stays too.</span></div>
+          <div className="row3"><span><span className="pill on">On device</span></span><b>Privileged work</b><span className="muted">Attached client files, marked text and anything the decision model flags as privileged are answered on your machine. Text that can&apos;t be read stays too.</span></div>
           <div className="row3"><span><span className="pill test">Testing</span></span><b>New public work</b><span className="muted">A local model and the cloud both answer. The lawyer picks between two unlabeled answers.</span></div>
           <div className="row3"><span><span className="pill on">On device</span></span><b>Work that has earned it</b><span className="muted">Once the local model has enough good answers, that task moves on device and the cloud stops being called.</span></div>
           <div className="row3"><span><span className="pill cloud">Cloud</span></span><b>Public work it can&apos;t do yet</b><span className="muted">Client names and private details are masked first, and restored on the device.</span></div>

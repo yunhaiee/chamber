@@ -15,7 +15,7 @@ export default function Results() {
       <section className="numbers" aria-label="Results">
         <div><strong><CountUp value={12} /></strong><p><b>Cloud calls avoided</b> in one simulated firm day, because the work had already moved on device.</p></div>
         <div><strong><CountUp value={1.0} decimals={1} suffix="s" /> / <CountUp value={2.6} decimals={1} suffix="s" /></strong><p><b>Median answer time</b> on device and in the cloud, across 23 requests both answered.</p></div>
-        <div><strong><CountUp value={144} /> of 144</strong><p><b>Right kind of work.</b> d1 picked correctly on all 144 test requests, at about 0.4 seconds each.</p></div>
+        <div><strong><CountUp value={144} /> of 144</strong><p><b>Right kind of work.</b> The decision model picked correctly on all 144 test requests, at about 0.4 seconds each.</p></div>
         <div><strong><CountUp value={0} /></strong><p><b>Privileged test requests scored as public</b> at the 0.30 threshold. Of 24 public questions, 5 were held back as false alarms.</p></div>
         <div><strong><CountUp value={136} /></strong><p><b>Attack cases</b> we wrote. After one fix, none got privileged text to the cloud.</p></div>
       </section>
